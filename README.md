@@ -230,6 +230,125 @@ git checkout -b phase1/data-ingestion dev
 
 ---
 
+## Project Progress Tracker
+
+> **Last updated**: 2026-04-12 — Phase 0 complete ✅
+
+### Phase 0 — Bootstrap ✅
+
+| Task | Owner | Status |
+|---|---|---|
+| `src/data/` directory tree + `__init__.py` files | Suvarna | ✅ Done |
+| `scripts/download_data.py` — WPRDC CSV downloader with URLs | Suvarna | ✅ Done |
+| `src/models/classifier/` scaffolding | Suvarna | ✅ Done |
+| `requirements.txt` — ML section (LightGBM, Optuna, MLflow, XGBoost) | Suvarna | ✅ Done |
+| `src/models/forecasting/` + `src/models/clustering/` scaffolding | Suvarna | ✅ Done |
+| `requirements.txt` — Prophet, DBSCAN, Isolation Forest deps | Suvarna | ✅ Done |
+| `src/rag/` scaffolding | Suvarna | ✅ Done |
+| `requirements.txt` — RAG section (LangChain, ChromaDB, sentence-transformers) | Suvarna | ✅ Done |
+| `.env.example` | Suvarna | ✅ Done |
+| `src/dashboard/app.py` — Dash skeleton with `use_pages=True` + Flask | Suvarna | ✅ Done |
+| 6 blank page stubs in `src/dashboard/pages/` | Suvarna | ✅ Done |
+| `config/settings.py` — Flask host/port/debug | Suvarna | ✅ Done |
+| `.gitignore` | Suvarna | ✅ Done |
+| `config/contracts.py` — NEMSIS v3 columns, Parquet schema, Dash contracts | Suvarna | ✅ Done |
+| `README.md` + `implementation_plan.md` | Suvarna | ✅ Done |
+
+---
+
+### Phase 1 — Data Ingestion & EDA (Days 1–3)
+
+| Task | Owner | Status |
+|---|---|---|
+| NEMSIS-aligned preprocessing → `fact_dispatch_clean.parquet` | Greeshma | ☐ |
+| `mpds_mapper.py` — map `description_short` → MPDS codes (>80% coverage) | Suvarna | ☐ |
+| Unit tests for MPDS mapper | Suvarna | ☐ |
+| `feature_engineering.py` — temporal cyclical encoding, geo encoding, lag features | Sanika | ☐ |
+| `demographic_join.py` — census block-group data join → `dim_cbg_demographics.parquet` | Srileakhana | ☐ |
+| `schemas.py` — Pydantic NEMSIS-aligned validation | Deekshitha | ☐ |
+| `01_eda_overview.ipynb` | Deekshitha | ☐ |
+| `02_temporal_eda.ipynb` | Deekshitha | ☐ |
+| `03_geo_eda.ipynb` | Deekshitha | ☐ |
+| `data_completeness_pct` scoring per row | Deekshitha | ☐ |
+
+**Milestone**: All clean Parquets written; >80% MPDS mapping confirmed.
+
+---
+
+### Phase 2 — ML Models (Days 3–7)
+
+| Task | Owner | Status |
+|---|---|---|
+| Training splits for all 3 models; coordinate feature set contracts | Greeshma | ☐ |
+| LightGBM + sklearn Pipeline; Optuna HPO (50 trials); target macro F1 >0.75 | Suvarna | ☐ |
+| Flag disagreement rows (confidence >0.7) | Suvarna | ☐ |
+| Prophet univariate + LightGBM ensemble (4-quarter horizon, MAPE <15%) | Sanika | ☐ |
+| DBSCAN hotspot detection (eps=0.3, min_samples=5) | Sanika | ☐ |
+| Isolation Forest anomaly detection (contamination=0.05) | Sanika | ☐ |
+| LightGBM forecasting component + ensemble combiner | Srileakhana | ☐ |
+| Serialize all models to `models/artifacts/` | Srileakhana | ☐ |
+| MLflow tracking instrumentation for all 3 models | Deekshitha | ☐ |
+| `evaluate.py` with all metric targets | Deekshitha | ☐ |
+| CI test stubs for each model | Deekshitha | ☐ |
+
+**Milestone**: All 3 models hitting targets; serialized artifacts in `models/artifacts/`.
+
+---
+
+### Phase 3 — RAG Pipeline (Days 5–7)
+
+| Task | Owner | Status |
+|---|---|---|
+| Source document collection: PA DOH EMS protocols, NFPA 1221, WPRDC glossary → text chunks | Greeshma | ☐ |
+| MPDS protocol reference + NEMSIS v3 data dictionary ingestion | Suvarna | ☐ |
+| Chunk quality validation (no garbled OCR text) | Suvarna | ☐ |
+| ChromaDB persistent vector store setup; batch embed with `all-MiniLM-L6-v2` | Sanika | ☐ |
+| Verify ChromaDB store integrity | Sanika | ☐ |
+| LangChain `RetrievalQA` chain with Claude `claude-haiku-4-5` | Srileakhana | ☐ |
+| System prompt (protocol-only, citation format, fallback) | Srileakhana | ☐ |
+| RAG evaluation: Precision@5 test suite | Deekshitha | ☐ |
+| LLM-as-judge faithfulness scorer | Deekshitha | ☐ |
+| Latency benchmark (p50 <3s, p95 <8s) | Deekshitha | ☐ |
+
+**Milestone**: ChromaDB populated; `rag_chain.py` returning cited answers; latency targets met.
+
+---
+
+### Phase 4 — Dash Dashboard (Days 7–12)
+
+| Task | Owner | Status |
+|---|---|---|
+| `pages/overview.py` — KPIs, EMS vs Fire donut, top-10 MPDS bar, stacked area | Greeshma | ☐ |
+| `pages/qa.py` — agreement DataTable, completeness chart, compliance trend | Suvarna | ☐ |
+| `pages/geography.py` — Mapbox choropleth, DBSCAN clusters, Response Equity tab | Sanika | ☐ |
+| `pages/temporal.py` — quarterly trend, anomaly markers, day-hour heatmap | Srileakhana | ☐ |
+| `pages/assistant.py` — chat interface, example prompts, source accordion | Srileakhana | ☐ |
+| `pages/forecast.py` — 4-quarter forecast, uncertainty bands, model toggle | Deekshitha | ☐ |
+| `components/filters.py` — global filter bar (year, service type, MPDS group) | Deekshitha | ☐ |
+| `components/map_utils.py` — shared choropleth + cluster helpers | Deekshitha | ☐ |
+| `components/chat_ui.py` — RAG chat component | Deekshitha | ☐ |
+
+**Milestone**: All 6 pages rendering live data; global filters wired via `dcc.Store`.
+
+---
+
+### Phase 5 — Evaluation & Tests (Days 11–13)
+
+| Task | Owner | Status |
+|---|---|---|
+| Data pipeline tests: MPDS coverage >80%, NEMSIS schema, completeness | Greeshma | ☐ |
+| Classifier: macro F1 >0.75, confusion matrix, disagreement recall | Suvarna | ☐ |
+| Forecaster: MAPE <15%, walk-forward CV | Sanika | ☐ |
+| Hotspot: Silhouette >0.4, Recall@20 >0.7 | Sanika | ☐ |
+| RAG: Precision@5 >0.6, faithfulness avg >1.5, latency p50 <3s | Srileakhana | ☐ |
+| Integration tests (Dash callbacks + data) | Deekshitha | ☐ |
+| `pytest` CI pipeline | Deekshitha | ☐ |
+| Final `README.md` with Mermaid architecture diagram | Deekshitha | ☐ |
+
+**Milestone**: All tests green; project submission ready.
+
+---
+
 ## Tech Stack
 
 | Category | Tools |

@@ -169,13 +169,15 @@ Pittsburgh EMS and Fire dispatch records from the [Western Pennsylvania Regional
 
 ## Team
 
-| Role | Name | Primary Domain |
-|---|---|---|
-| C1 | **Greeshma** | Data Engineering & Ingestion |
-| C2 | **Suvarna** | ML — Classification & QA |
-| C3 | **Sanika** | ML — Forecasting & Clustering |
-| C4 | **Srileakhana** | RAG Pipeline & LLM |
-| C5 | **Deekshitha** | Dashboard (Plotly Dash) & Testing |
+All 5 contributors work across all 5 phases. Each person has specific deliverables in every phase:
+
+| Name | Phase 1: Data | Phase 2: ML Models | Phase 3: RAG | Phase 4: Dashboard | Phase 5: Testing |
+|---|---|---|---|---|---|
+| **Greeshma** | Preprocessing, clean Parquet | Training splits, feature contracts | Doc collection & conversion | Overview page | Data pipeline tests |
+| **Suvarna** | MPDS mapper | MPDS Classifier (LightGBM) | MPDS protocol ingestion | Classification QA page | Classifier metrics |
+| **Sanika** | Feature engineering | Forecaster + Clustering | ChromaDB vector store | Geography page | Forecaster & clustering metrics |
+| **Srileakhana** | Demographic join | Ensemble + model serialization | LangChain QA chain | Temporal + Assistant pages | RAG evaluation |
+| **Deekshitha** | Pydantic schemas, EDA | MLflow + evaluation harness | RAG eval suite | Forecast page + components | Integration tests, CI |
 
 ---
 

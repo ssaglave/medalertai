@@ -1,0 +1,42 @@
+# ── Core ──
+flask>=3.0
+dash>=2.17
+dash-bootstrap-components>=1.6
+plotly>=5.22
+pandas>=2.2
+numpy>=1.26
+
+# ── Geospatial ──
+geopandas>=0.14
+
+# ── ML ──
+scikit-learn>=1.4
+lightgbm>=4.3
+xgboost>=2.0
+optuna>=3.5
+prophet>=1.1
+
+# ── RAG ──
+langchain>=0.1
+langchain-community>=0.0.20
+chromadb>=0.4
+sentence-transformers>=2.5
+anthropic>=0.18
+
+# ── Data Validation ──
+pydantic>=2.6
+pyarrow>=15.0
+
+# ── Document Parsing ──
+PyPDF2>=3.0
+python-docx>=1.1
+
+# ── Experiment Tracking ──
+mlflow>=2.11
+
+# ── Utils ──
+python-dotenv>=1.0
+
+# ── Testing ──
+pytest>=8.0
+pytest-cov>=4.1

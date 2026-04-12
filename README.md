@@ -49,9 +49,14 @@ pip install -r requirements.txt
 cp .env.example .env           # fill in your API keys
 ```
 
-> **Note**: This repo uses **Git LFS** for large data files. Install [Git LFS](https://git-lfs.github.com/) and run `git lfs install` before cloning to automatically download the CSV data files.
+### 2. Download Data
 
-### 2. Run Dashboard
+```bash
+python scripts/download_data.py
+# Downloads EMS_Data.csv (~398 MB) and Fire_Data.csv (~165 MB) from WPRDC
+```
+
+### 3. Run Dashboard
 
 ```bash
 python src/dashboard/app.py
@@ -70,7 +75,7 @@ medalertai/
 ├── scripts/
 │   └── download_data.py         ← WPRDC data downloader (Greeshma)
 ├── data/
-│   ├── raw/                     ← EMS_Data.csv, Fire_Data.csv (Git LFS)
+│   ├── raw/                     ← EMS_Data.csv, Fire_Data.csv (downloaded via script)
 │   ├── processed/               ← Clean Parquets (gitignored, regenerated)
 │   └── external/                ← Census & demographic source files
 ├── models/
@@ -121,10 +126,12 @@ medalertai/
 
 Pittsburgh EMS and Fire dispatch records from the [Western Pennsylvania Regional Data Center (WPRDC)](https://data.wprdc.org/dataset/ems-fire-dispatch-data).
 
-| File | Rows | Size | Content |
+Data is **not stored in the repo** due to file size. Run `python scripts/download_data.py` to fetch directly from WPRDC.
+
+| File | Rows | Size | Download URL |
 |---|---|---|---|
-| `EMS_Data.csv` | ~2.3M | 398 MB | EMS dispatch records (2015–2025) |
-| `Fire_Data.csv` | ~985K | 165 MB | Fire dispatch records (2015–2025) |
+| `EMS_Data.csv` | ~2.3M | 398 MB | [WPRDC EMS](https://tools.wprdc.org/downstream/ff33ca18-2e0c-4cb5-bdcd-60a5dc3c0418) |
+| `Fire_Data.csv` | ~985K | 165 MB | [WPRDC Fire](https://tools.wprdc.org/downstream/b6340d98-69a0-4965-a9b4-3480cea1182b) |
 
 ### Columns
 

@@ -98,6 +98,12 @@ FILTER_STORE_SCHEMA = {
     "city_name": "list[str]",      # selected cities
 }
 
+# ── Data Source URLs (WPRDC direct download) ──
+DATA_URLS = {
+    "ems_raw": "https://tools.wprdc.org/downstream/ff33ca18-2e0c-4cb5-bdcd-60a5dc3c0418",
+    "fire_raw": "https://tools.wprdc.org/downstream/b6340d98-69a0-4965-a9b4-3480cea1182b",
+}
+
 # ── Data File Paths (relative to project root) ──
 DATA_FILES = {
     "ems_raw": "data/raw/EMS_Data.csv",

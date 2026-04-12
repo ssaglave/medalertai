@@ -186,26 +186,35 @@ All 5 contributors work across all 5 phases. Each person has specific deliverabl
 ### Branch Strategy
 
 ```
-main                  ← protected, always working
-├── dev               ← integration branch
-├── c1/greeshma       ← Data Engineering
-├── c2/suvarna        ← ML Classification
-├── c3/sanika         ← ML Forecasting & Clustering
-├── c4/srileakhana    ← RAG Pipeline
-└── c5/deekshitha     ← Dashboard & Testing
+main                         ← protected, always working
+├── dev                      ← integration branch, PRs merge here first
+├── phase0/bootstrap         ← Phase 0: Project scaffold & contracts
+├── phase1/data-ingestion    ← Phase 1: Preprocessing, MPDS mapping, features, demographics, EDA
+├── phase2/ml-models         ← Phase 2: Classifier, forecaster, clustering, evaluation
+├── phase3/rag-pipeline      ← Phase 3: Doc ingestion, ChromaDB, LangChain QA chain
+├── phase4/dashboard         ← Phase 4: All 6 Dash pages + components
+└── phase5/testing           ← Phase 5: Tests, CI, final integration
 ```
 
-### Setup Your Branch
+All 5 contributors work on the same phase branch simultaneously, then merge to `dev` at each phase milestone.
+
+### Workflow
 
 ```bash
+# Setup
 git checkout -b dev origin/main
-git checkout -b c1/greeshma dev       # (replace with your branch)
+
+# Start work on current phase
+git checkout -b phase1/data-ingestion dev
+
+# Each contributor works on their files within the phase branch
+# Push and create PRs to dev at milestone completion
 ```
 
 ### PR Flow
 
-1. Push to your feature branch
-2. Open PR → `dev`
+1. Work on the current phase branch
+2. Open PR → `dev` at phase milestone
 3. Get at least 1 review
 4. Merge to `dev`
 5. Periodically: `dev` → `main` after integration testing

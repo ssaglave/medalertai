@@ -8,7 +8,7 @@ from src.data.feature_engineering import (
 
 def test_cyclical_features():
     df = pd.DataFrame({
-        "time": pd.date_range("2024-01-01", periods=10, freq="H")
+        "time": pd.date_range("2024-01-01", periods=10, freq="h")
     })
 
     result = add_cyclical_features(df, "time")

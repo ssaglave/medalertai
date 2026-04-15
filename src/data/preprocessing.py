@@ -394,7 +394,7 @@ def run_pipeline(
     combined = pd.concat(frames, ignore_index=True, sort=False)
     log.info("  Combined shape: %s", combined.shape)
 
-    # --- Validate required columns ---
+    # --- Validate required columns (pre-rename) ---
     missing = [c for c in REQUIRED_COLUMNS if c not in combined.columns]
     if missing:
         log.error("Final DataFrame is missing required columns: %s", missing)
@@ -405,6 +405,24 @@ def run_pipeline(
     log.info("  Average row completeness: %.1f%%", avg_completeness * 100)
     null_summary = combined[REQUIRED_COLUMNS].isna().sum()
     log.info("  Null counts per required column:\n%s", null_summary.to_string())
+
+    # --- Rename columns to NEMSIS v3 canonical names ---
+    # This ensures the Parquet uses the same column names expected by
+    # contracts.py, schemas.py, and all downstream consumers (dashboard, ML).
+    from config.contracts import COLUMN_MAPPING
+    rename_map = {k: v for k, v in COLUMN_MAPPING.items() if k in combined.columns}
+    combined = combined.rename(columns=rename_map)
+    log.info("  Renamed %d columns to NEMSIS v3 canonical names.", len(rename_map))
+
+    # --- Convert quarter from int (1–4) to string ("Q1"–"Q4") ---
+    _quarter_map = {1: "Q1", 2: "Q2", 3: "Q3", 4: "Q4"}
+    if "quarter" in combined.columns:
+        combined["quarter"] = (
+            pd.to_numeric(combined["quarter"], errors="coerce")
+            .map(_quarter_map)
+            .astype("string")
+        )
+        log.info("  Converted quarter values to Q1–Q4 string format.")
 
     if dry_run:
         log.info("Dry-run mode: skipping Parquet write.")

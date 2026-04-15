@@ -81,12 +81,13 @@ MPDS_GROUPS = [
     "Assault", "Back Pain", "Breathing Problems",
     "Burns", "Carbon Monoxide", "Cardiac Arrest",
     "Chest Pain", "Choking", "Diabetic Problems",
-    "Drowning", "Electrocution", "Eye Problems",
-    "Falls", "Fire", "Headache",
-    "Heart Problems", "Hemorrhage", "Overdose",
-    "Psychiatric", "Seizures", "Stabbing",
-    "Stroke", "Traffic Accident", "Unconscious",
-    "Unknown Problem",
+    "Drowning", "Electrocution", "EMS Assist",
+    "Eye Problems", "Falls", "Fire",
+    "Headache", "Heart Problems", "Hemorrhage",
+    "Overdose", "Psychiatric", "Seizures",
+    "Sick Person", "Stabbing", "Stroke",
+    "Traffic Accident", "Transfer/Transport",
+    "Unconscious", "Unknown Problem",
 ]
 
 # ── Dash Callback Contracts ──

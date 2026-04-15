@@ -43,6 +43,107 @@ OPTIONAL_FIELDS = [
 
 ALL_FIELDS = CORE_FIELDS + OPTIONAL_FIELDS
 
+# ── Quarter integer → string mapping ──
+QUARTER_INT_TO_STR = {1: "Q1", 2: "Q2", 3: "Q3", 4: "Q4"}
+
+
+# ── Column Normalization (raw → NEMSIS) ──
+
+
+def rename_to_nemsis(df: pd.DataFrame) -> pd.DataFrame:
+    """Rename raw / preprocessing column names to NEMSIS-aligned names.
+
+    Uses the shared ``COLUMN_MAPPING`` from ``config/contracts.py`` so that
+    DataFrames produced by Greeshma's ``preprocessing.py`` (which keeps raw
+    column names like ``call_id_hash``, ``service``, ``description_short``)
+    are converted to the canonical NEMSIS names used by ``DispatchRecord``,
+    the dashboard pages, and all downstream consumers.
+
+    Columns not in the mapping are left unchanged.
+
+    Parameters
+    ----------
+    df : pd.DataFrame
+        DataFrame with raw column names.
+
+    Returns
+    -------
+    pd.DataFrame
+        DataFrame with NEMSIS-aligned column names.
+    """
+    try:
+        from config.contracts import COLUMN_MAPPING
+    except ImportError:
+        COLUMN_MAPPING = {}
+
+    # Only rename columns that actually exist in the DataFrame
+    rename_map = {k: v for k, v in COLUMN_MAPPING.items() if k in df.columns}
+    return df.rename(columns=rename_map)
+
+
+def map_quarter_values(df: pd.DataFrame, col: str = "quarter") -> pd.DataFrame:
+    """Convert integer quarter values (1, 2, 3, 4) to strings ("Q1"–"Q4").
+
+    Greeshma's preprocessing outputs ``call_quarter`` as int8 (1–4).
+    The NEMSIS schema and dashboard pages expect string format ("Q1"–"Q4").
+    This function handles both cases gracefully:
+      - If values are already strings like "Q1", they are left as-is.
+      - If values are ints (1–4), they are mapped to "Q1"–"Q4".
+
+    Parameters
+    ----------
+    df : pd.DataFrame
+        DataFrame containing the quarter column.
+    col : str
+        Name of the quarter column (default: ``"quarter"``).
+
+    Returns
+    -------
+    pd.DataFrame
+        DataFrame with quarter values as strings.
+    """
+    if col not in df.columns:
+        return df
+
+    df = df.copy()
+
+    # Check if already string format ("Q1", "Q2", etc.)
+    sample = df[col].dropna().head(10)
+    if len(sample) > 0 and sample.astype(str).str.match(r"^Q[1-4]$").all():
+        # Already in "Q1"–"Q4" format
+        return df
+
+    # Map int → str, handling NaN and nullable int types
+    df[col] = (
+        pd.to_numeric(df[col], errors="coerce")
+        .map(QUARTER_INT_TO_STR)
+        .astype("string")
+    )
+    return df
+
+
+def normalize_dataframe(df: pd.DataFrame) -> pd.DataFrame:
+    """Convenience function: rename columns to NEMSIS names + fix quarter format.
+
+    Combines ``rename_to_nemsis()`` and ``map_quarter_values()`` into a
+    single call. Use this when loading data from Greeshma's
+    ``fact_dispatch_clean.parquet`` before passing it to dashboards,
+    validation, or completeness scoring.
+
+    Parameters
+    ----------
+    df : pd.DataFrame
+        DataFrame with raw / preprocessing column names.
+
+    Returns
+    -------
+    pd.DataFrame
+        DataFrame with NEMSIS-aligned column names and "Q1"–"Q4" quarters.
+    """
+    df = rename_to_nemsis(df)
+    df = map_quarter_values(df)
+    return df
+
 
 class DispatchRecord(BaseModel):
     """Pydantic schema for a single cleaned dispatch record.

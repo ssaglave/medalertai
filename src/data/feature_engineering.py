@@ -6,9 +6,9 @@ def add_cyclical_features(df: pd.DataFrame, datetime_col: str) -> pd.DataFrame:
     df = df.copy()
     dt = pd.to_datetime(df[datetime_col])
 
-    df["hour"] = dt.dt.hour
-    df["day_of_week"] = dt.dt.dayofweek
-    df["month"] = dt.dt.month
+    df["hour"] = dt.dt.hour.astype("int8")
+    df["day_of_week"] = dt.dt.dayofweek.astype("int8")
+    df["month"] = dt.dt.month.astype("int8")
 
     df["hour_sin"] = np.sin(2 * np.pi * df["hour"] / 24)
     df["hour_cos"] = np.cos(2 * np.pi * df["hour"] / 24)

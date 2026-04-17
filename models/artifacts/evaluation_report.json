@@ -1,0 +1,64 @@
+{
+  "timestamp": "2026-04-17 15:05:14",
+  "phase": "Phase 2 \u2014 ML Models",
+  "owner": "Deekshitha (C5)",
+  "models": {
+    "classifier": {
+      "model_name": "classifier",
+      "metrics": {
+        "engine": "HistGradientBoosting",
+        "validation": {
+          "split": "validation",
+          "accuracy": 1.0,
+          "macro_f1": 1.0,
+          "weighted_f1": 1.0,
+          "macro_precision": 1.0,
+          "macro_recall": 1.0
+        },
+        "test": {
+          "split": "test",
+          "accuracy": 1.0,
+          "macro_f1": 0.9999,
+          "weighted_f1": 1.0,
+          "macro_precision": 0.9998,
+          "macro_recall": 1.0
+        },
+        "n_classes": 31,
+        "n_train_rows": 2313502,
+        "training_time_sec": 294.6,
+        "n_disagreements": 2,
+        "n_test_rows": 495751
+      },
+      "targets": {
+        "macro_f1": {
+          "value": 0.9999,
+          "threshold": 0.75,
+          "passed": true
+        },
+        "accuracy": {
+          "value": 1.0,
+          "threshold": null,
+          "passed": true
+        },
+        "weighted_f1": {
+          "value": 1.0,
+          "threshold": null,
+          "passed": true
+        },
+        "macro_precision": {
+          "value": 0.9998,
+          "threshold": null,
+          "passed": true
+        },
+        "macro_recall": {
+          "value": 1.0,
+          "threshold": null,
+          "passed": true
+        }
+      },
+      "passed": true,
+      "error": null
+    }
+  },
+  "overall_status": "PASS"
+}

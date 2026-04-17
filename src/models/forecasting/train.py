@@ -30,6 +30,7 @@ except ImportError:
     _HAS_PROPHET = False
 
 from config.settings import MODEL_ARTIFACTS_DIR, PROCESSED_DATA_DIR, PROJECT_ROOT
+from src.models.forecasting.ensemble import train_and_serialize_ensemble
 
 logging.basicConfig(
     level=logging.INFO,
@@ -145,7 +146,7 @@ def log_to_mlflow(metrics: dict):
         log.warning("MLflow logging failed (non-fatal): %s", exc)
 
 
-def run_training(use_mlflow: bool = True):
+def run_training(use_mlflow: bool = True, skip_ensemble: bool = False):
     start = time.time()
     log.info("=== MedAlertAI Forecasting Pipeline (Sanika) ===")
     
@@ -163,6 +164,18 @@ def run_training(use_mlflow: bool = True):
     metrics = evaluate_walk_forward(model)
     
     save_artifacts(model, metrics, FORECASTING_ARTIFACTS_DIR)
+
+    if not skip_ensemble:
+        try:
+            ensemble_summary = train_and_serialize_ensemble(
+                ts=ts,
+                prophet_model=model,
+                output_dir=FORECASTING_ARTIFACTS_DIR,
+            )
+            metrics["ensemble"] = ensemble_summary
+            save_artifacts(model, metrics, FORECASTING_ARTIFACTS_DIR)
+        except Exception as exc:
+            log.warning("C4 ensemble serialization failed (non-fatal): %s", exc)
     
     if use_mlflow:
         log_to_mlflow(metrics)
@@ -173,9 +186,14 @@ def run_training(use_mlflow: bool = True):
 def _parse_args(argv=None):
     parser = argparse.ArgumentParser(description="MedAlertAI — Phase 2 Forecasting Training")
     parser.add_argument("--no-mlflow", action="store_true", help="Disable MLflow tracking")
+    parser.add_argument(
+        "--skip-ensemble",
+        action="store_true",
+        help="Skip C4 LightGBM ensemble serialization",
+    )
     return parser.parse_args(argv)
 
 
 if __name__ == "__main__":
     args = _parse_args()
-    run_training(use_mlflow=not args.no_mlflow)
+    run_training(use_mlflow=not args.no_mlflow, skip_ensemble=args.skip_ensemble)

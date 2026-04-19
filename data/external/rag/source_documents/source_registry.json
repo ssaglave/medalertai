@@ -43,5 +43,41 @@
     "category": "wprdc_glossary",
     "license_note": "Public WPRDC wiki page explaining data dictionary fields.",
     "download": true
+  },
+  {
+    "source_id": "mpds_protocol_reference",
+    "title": "MPDS Protocol Reference (Educational Summary)",
+    "owner": "MedAlertAI project (educational summary based on public MPDS information)",
+    "url": "",
+    "category": "mpds_protocols",
+    "license_note": "Educational reference summary; MPDS is proprietary to IAED. Do not redistribute the IAED standard itself.",
+    "download": false
+  },
+  {
+    "source_id": "mpds_dispatch_mapping",
+    "title": "MPDS Dispatch Mapping (Pittsburgh raw call types → MPDS groups)",
+    "owner": "MedAlertAI project",
+    "url": "",
+    "category": "mpds_protocols",
+    "license_note": "Project-authored mapping document tying WPRDC Pittsburgh dispatch records to MPDS protocol groups.",
+    "download": false
+  },
+  {
+    "source_id": "nemsis_v3_data_dictionary",
+    "title": "NEMSIS v3 Data Dictionary (Project Subset)",
+    "owner": "MedAlertAI project (based on NEMSIS v3.5 standard)",
+    "url": "https://nemsis.org/technical-resources/version-3/",
+    "category": "nemsis_standard",
+    "license_note": "Subset reference of the NEMSIS v3 standard, used for educational purposes.",
+    "download": false
+  },
+  {
+    "source_id": "nemsis_v3_reference",
+    "title": "NEMSIS v3 Reference Overview",
+    "owner": "MedAlertAI project (based on NEMSIS v3 public materials)",
+    "url": "https://nemsis.org/",
+    "category": "nemsis_standard",
+    "license_note": "Educational overview of NEMSIS v3 data standard; sourced from public NEMSIS materials.",
+    "download": false
   }
 ]

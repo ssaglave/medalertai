@@ -43,3 +43,8 @@ mlruns/
 
 # Raw CSV data (too large for git — download from WPRDC or shared drive)
 data/raw/*.csv
+
+# RAG source documents (download or place locally; do not commit PDFs/licensed docs)
+data/external/rag/source_documents/*
+!data/external/rag/source_documents/source_registry.json
+!data/external/rag/source_documents/.gitkeep

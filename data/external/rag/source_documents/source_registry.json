@@ -1,0 +1,47 @@
+[
+  {
+    "source_id": "pa_doh_ems_regulations",
+    "title": "Pennsylvania EMS Regulations and Protocols",
+    "owner": "Pennsylvania Department of Health",
+    "url": "https://www.pa.gov/agencies/health/healthcare-and-public-health-professionals/ems/ems-regulations",
+    "category": "pa_doh_ems",
+    "license_note": "Public government web page; use as source index for current protocol PDFs.",
+    "download": true
+  },
+  {
+    "source_id": "pa_doh_2023_bls_protocols",
+    "title": "Final 2023 Pennsylvania BLS Protocols",
+    "owner": "Pennsylvania Department of Health",
+    "url": "https://www.pa.gov/content/dam/copapwp-pagov/en/health/documents/topics/documents/ems/2023v1-2%20PA%20BLS%20Protocols.pdf",
+    "category": "pa_doh_ems",
+    "license_note": "Public government protocol PDF.",
+    "download": true
+  },
+  {
+    "source_id": "pa_doh_2023_als_protocols",
+    "title": "Final 2023 Pennsylvania ALS Protocols",
+    "owner": "Pennsylvania Department of Health",
+    "url": "https://www.pa.gov/agencies/health/healthcare-and-public-health-professionals/ems/ems-regulations",
+    "category": "pa_doh_ems",
+    "license_note": "Protocol PDF is linked from the PA DOH EMS regulations page; add the downloaded PDF locally if the URL changes.",
+    "download": false
+  },
+  {
+    "source_id": "nfpa_1221_2019_reference",
+    "title": "NFPA 1221-2019 Standard Reference Page",
+    "owner": "National Fire Protection Association",
+    "url": "https://webstore.ansi.org/standards/nfpa/nfpa12212019",
+    "category": "nfpa_communications",
+    "license_note": "Do not commit NFPA standard PDFs. Use this public metadata page or a locally licensed copy only.",
+    "download": false
+  },
+  {
+    "source_id": "wprdc_data_dictionaries",
+    "title": "WPRDC Data Dictionaries",
+    "owner": "Western Pennsylvania Regional Data Center",
+    "url": "https://wiki.wprdc.org/wiki/Data_Dictionaries",
+    "category": "wprdc_glossary",
+    "license_note": "Public WPRDC wiki page explaining data dictionary fields.",
+    "download": true
+  }
+]

@@ -36,6 +36,7 @@ from pathlib import Path
 from typing import Iterable, Optional
 
 from config.settings import PROCESSED_DATA_DIR, PROJECT_ROOT
+from src.rag.quality import validate_chunk
 
 
 log = logging.getLogger("medalertai.rag.ingest")
@@ -98,6 +99,42 @@ DEFAULT_SOURCES = [
         "category": "wprdc_glossary",
         "license_note": "Public WPRDC wiki page explaining data dictionary fields.",
         "download": True,
+    },
+    {
+        "source_id": "mpds_protocol_reference",
+        "title": "MPDS Protocol Reference (Educational Summary)",
+        "owner": "MedAlertAI project (educational summary based on public MPDS information)",
+        "url": "",
+        "category": "mpds_protocols",
+        "license_note": "Educational reference summary; MPDS is proprietary to IAED. Do not redistribute the IAED standard itself.",
+        "download": False,
+    },
+    {
+        "source_id": "mpds_dispatch_mapping",
+        "title": "MPDS Dispatch Mapping (Pittsburgh raw call types → MPDS groups)",
+        "owner": "MedAlertAI project",
+        "url": "",
+        "category": "mpds_protocols",
+        "license_note": "Project-authored mapping document tying WPRDC Pittsburgh dispatch records to MPDS protocol groups.",
+        "download": False,
+    },
+    {
+        "source_id": "nemsis_v3_data_dictionary",
+        "title": "NEMSIS v3 Data Dictionary (Project Subset)",
+        "owner": "MedAlertAI project (based on NEMSIS v3.5 standard)",
+        "url": "https://nemsis.org/technical-resources/version-3/",
+        "category": "nemsis_standard",
+        "license_note": "Subset reference of the NEMSIS v3 standard, used for educational purposes.",
+        "download": False,
+    },
+    {
+        "source_id": "nemsis_v3_reference",
+        "title": "NEMSIS v3 Reference Overview",
+        "owner": "MedAlertAI project (based on NEMSIS v3 public materials)",
+        "url": "https://nemsis.org/",
+        "category": "nemsis_standard",
+        "license_note": "Educational overview of NEMSIS v3 data standard; sourced from public NEMSIS materials.",
+        "download": False,
     },
 ]
 
@@ -329,7 +366,7 @@ def chunk_text(text: str, chunk_size: int = CHUNK_SIZE, overlap: int = CHUNK_OVE
     if current:
         chunks.extend(_split_long_text(current, chunk_size, overlap))
 
-    return [chunk for chunk in chunks if _quality_score(chunk)["passes"]]
+    return [chunk for chunk in chunks if validate_chunk(chunk)["passes"]]
 
 
 def _split_long_text(text: str, chunk_size: int, overlap: int) -> list[str]:

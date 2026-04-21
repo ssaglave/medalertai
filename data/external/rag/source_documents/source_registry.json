@@ -1,0 +1,83 @@
+[
+  {
+    "source_id": "pa_doh_ems_regulations",
+    "title": "Pennsylvania EMS Regulations and Protocols",
+    "owner": "Pennsylvania Department of Health",
+    "url": "https://www.pa.gov/agencies/health/healthcare-and-public-health-professionals/ems/ems-regulations",
+    "category": "pa_doh_ems",
+    "license_note": "Public government web page; use as source index for current protocol PDFs.",
+    "download": true
+  },
+  {
+    "source_id": "pa_doh_2023_bls_protocols",
+    "title": "Final 2023 Pennsylvania BLS Protocols",
+    "owner": "Pennsylvania Department of Health",
+    "url": "https://www.pa.gov/content/dam/copapwp-pagov/en/health/documents/topics/documents/ems/2023v1-2%20PA%20BLS%20Protocols.pdf",
+    "category": "pa_doh_ems",
+    "license_note": "Public government protocol PDF.",
+    "download": true
+  },
+  {
+    "source_id": "pa_doh_2023_als_protocols",
+    "title": "Final 2023 Pennsylvania ALS Protocols",
+    "owner": "Pennsylvania Department of Health",
+    "url": "https://www.pa.gov/agencies/health/healthcare-and-public-health-professionals/ems/ems-regulations",
+    "category": "pa_doh_ems",
+    "license_note": "Protocol PDF is linked from the PA DOH EMS regulations page; add the downloaded PDF locally if the URL changes.",
+    "download": false
+  },
+  {
+    "source_id": "nfpa_1221_2019_reference",
+    "title": "NFPA 1221-2019 Standard Reference Page",
+    "owner": "National Fire Protection Association",
+    "url": "https://webstore.ansi.org/standards/nfpa/nfpa12212019",
+    "category": "nfpa_communications",
+    "license_note": "Do not commit NFPA standard PDFs. Use this public metadata page or a locally licensed copy only.",
+    "download": false
+  },
+  {
+    "source_id": "wprdc_data_dictionaries",
+    "title": "WPRDC Data Dictionaries",
+    "owner": "Western Pennsylvania Regional Data Center",
+    "url": "https://wiki.wprdc.org/wiki/Data_Dictionaries",
+    "category": "wprdc_glossary",
+    "license_note": "Public WPRDC wiki page explaining data dictionary fields.",
+    "download": true
+  },
+  {
+    "source_id": "mpds_protocol_reference",
+    "title": "MPDS Protocol Reference (Educational Summary)",
+    "owner": "MedAlertAI project (educational summary based on public MPDS information)",
+    "url": "",
+    "category": "mpds_protocols",
+    "license_note": "Educational reference summary; MPDS is proprietary to IAED. Do not redistribute the IAED standard itself.",
+    "download": false
+  },
+  {
+    "source_id": "mpds_dispatch_mapping",
+    "title": "MPDS Dispatch Mapping (Pittsburgh raw call types → MPDS groups)",
+    "owner": "MedAlertAI project",
+    "url": "",
+    "category": "mpds_protocols",
+    "license_note": "Project-authored mapping document tying WPRDC Pittsburgh dispatch records to MPDS protocol groups.",
+    "download": false
+  },
+  {
+    "source_id": "nemsis_v3_data_dictionary",
+    "title": "NEMSIS v3 Data Dictionary (Project Subset)",
+    "owner": "MedAlertAI project (based on NEMSIS v3.5 standard)",
+    "url": "https://nemsis.org/technical-resources/version-3/",
+    "category": "nemsis_standard",
+    "license_note": "Subset reference of the NEMSIS v3 standard, used for educational purposes.",
+    "download": false
+  },
+  {
+    "source_id": "nemsis_v3_reference",
+    "title": "NEMSIS v3 Reference Overview",
+    "owner": "MedAlertAI project (based on NEMSIS v3 public materials)",
+    "url": "https://nemsis.org/",
+    "category": "nemsis_standard",
+    "license_note": "Educational overview of NEMSIS v3 data standard; sourced from public NEMSIS materials.",
+    "download": false
+  }
+]

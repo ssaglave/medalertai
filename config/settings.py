@@ -34,3 +34,10 @@ FORECAST_HORIZON_QUARTERS = 4
 DBSCAN_EPS = 0.3
 DBSCAN_MIN_SAMPLES = 5
 ISOLATION_FOREST_CONTAMINATION = 0.05
+
+# ── RAG Evaluation Targets (Phase 3, C5) ──
+RAG_PRECISION_AT_K_TARGET = 0.6          # Precision@5 > 0.6
+RAG_FAITHFULNESS_AVG_TARGET = 1.5        # LLM-as-judge mean > 1.5 (0–3 scale)
+RAG_LATENCY_P50_TARGET_S = 3.0           # p50 < 3 seconds
+RAG_LATENCY_P95_TARGET_S = 8.0           # p95 < 8 seconds
+RAG_EVAL_RESULTS_DIR = PROJECT_ROOT / "eval_results"

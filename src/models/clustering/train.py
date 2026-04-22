@@ -39,6 +39,8 @@ log = logging.getLogger("medalertai.clustering")
 warnings.filterwarnings("ignore")
 
 CLUSTERING_ARTIFACTS_DIR = MODEL_ARTIFACTS_DIR / "clustering"
+MAX_SAMPLES_IFOREST = 100000
+RECALL_TOP_P = 0.2
 
 
 def load_clustering_data() -> tuple[pd.DataFrame, pd.DataFrame]:
@@ -112,7 +114,7 @@ def train_isolation_forest(df: pd.DataFrame) -> dict:
     features = ["latitude", "longitude", "hour", "day_of_week", "month"]
     available_features = [f for f in features if f in df.columns]
     
-    train_df = df.dropna(subset=available_features).sample(min(100000, len(df)), random_state=42)
+    train_df = df.dropna(subset=available_features).sample(min(MAX_SAMPLES_IFOREST, len(df)), random_state=42)
     
     X = train_df[available_features].values
     scaler = StandardScaler()
@@ -124,7 +126,7 @@ def train_isolation_forest(df: pd.DataFrame) -> dict:
     scores = iso_forest.score_samples(X_scaled)
     train_df["anomaly_score"] = scores
     
-    top_20 = train_df.sort_values("anomaly_score").head(int(0.2 * len(train_df)))
+    top_20 = train_df.sort_values("anomaly_score").head(int(RECALL_TOP_P * len(train_df)))
     
     recall_20 = 0.0
     if "priority_code" in train_df.columns:

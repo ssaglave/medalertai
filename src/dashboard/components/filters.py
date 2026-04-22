@@ -8,11 +8,11 @@ Features:
   - Year multi-select dropdown
   - Service type (EMS/Fire) toggle
   - MPDS group multi-select
-  - Updates dcc.Store('global-filters')
+  - Updates dcc.Store('global-filter-store')
 """
 
 import dash
-from dash import dcc, html, callback, Input, Output
+from dash import dcc, html, callback, Input, Output, State
 import dash_bootstrap_components as dbc
 import pandas as pd
 
@@ -20,27 +20,27 @@ import pandas as pd
 def create_filter_bar(data_df: pd.DataFrame) -> dbc.Row:
     """
     Create a global filter bar component.
-    
+
     Args:
-        data_df: DataFrame with columns: call_year, service, description_short (MPDS category)
-    
+        data_df: DataFrame with columns: CALL_YEAR, service_type, call_type
+
     Returns:
         dbc.Row containing the filter UI and dcc.Store for shared state
     """
-    
-    # Extract unique values for dropdowns
-    years = sorted(data_df['call_year'].unique())
-    services = sorted(data_df['service'].unique())
-    mpds_categories = sorted(data_df['description_short'].unique())
-    
+
+    # Extract unique values for dropdowns (use actual parquet column names)
+    years = sorted(data_df['CALL_YEAR'].unique().tolist())
+    services = sorted(data_df['service_type'].unique().tolist())
+    call_types = sorted(data_df['call_type'].dropna().unique().tolist())
+
     return dbc.Row([
         # Global Filter Store (all callbacks wire to this)
         dcc.Store(id='global-filter-store', data={
             'years': years,
             'services': services,
-            'mpds_categories': mpds_categories
+            'call_types': call_types
         }),
-        
+
         dbc.Col([
             dbc.Label("Year(s)", className="fw-bold"),
             dcc.Dropdown(
@@ -51,7 +51,7 @@ def create_filter_bar(data_df: pd.DataFrame) -> dbc.Row:
                 placeholder="Select year(s)"
             )
         ], md=3),
-        
+
         dbc.Col([
             dbc.Label("Service Type", className="fw-bold"),
             dcc.Dropdown(
@@ -62,25 +62,26 @@ def create_filter_bar(data_df: pd.DataFrame) -> dbc.Row:
                 placeholder="Select service type(s)"
             )
         ], md=3),
-        
+
         dbc.Col([
-            dbc.Label("MPDS Category", className="fw-bold"),
+            dbc.Label("Incident Category", className="fw-bold"),
             dcc.Dropdown(
                 id='mpds-filter',
-                options=[{'label': m, 'value': m} for m in mpds_categories],
-                value=mpds_categories,  # Default: all categories selected
+                options=[{'label': m, 'value': m} for m in call_types],
+                value=[],  # Default: no filter (show all)
                 multi=True,
-                placeholder="Select MPDS category(ies)"
+                placeholder="Filter by category (optional)"
             )
-        ], md=6),
-        
-        # Clear button
+        ], md=5),
+
+        # Reset button
         dbc.Col([
             html.Br(),
-            dbc.Button("Reset Filters", id='reset-filters-btn', color="secondary", size="sm")
-        ], md=12, className="mt-3")
-        
-    ], className="mb-4 p-3 border rounded bg-light")
+            dbc.Button("Reset Filters", id='reset-filters-btn',
+                       color="secondary", size="sm", className="mt-1")
+        ], md=1),
+
+    ], className="mb-4 p-3 border rounded bg-dark")
 
 
 @callback(
@@ -91,7 +92,7 @@ def create_filter_bar(data_df: pd.DataFrame) -> dbc.Row:
     Input('reset-filters-btn', 'n_clicks'),
     prevent_initial_call=False
 )
-def update_global_filters(years, services, mpds, reset_clicks):
+def update_global_filters(years, services, call_types, reset_clicks):
     """
     Update the global filter store whenever any filter changes.
     Other pages' callbacks subscribe to 'global-filter-store' data.
@@ -99,5 +100,6 @@ def update_global_filters(years, services, mpds, reset_clicks):
     return {
         'years': years if years else [],
         'services': services if services else [],
-        'mpds_categories': mpds if mpds else []
+        'call_types': call_types if call_types else []
     }
+

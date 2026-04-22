@@ -40,13 +40,19 @@ server = app.server
 
 # Load data for filter initialization
 try:
-    data_df = pd.read_parquet("data/raw/fact_dispatch_clean.parquet")
+    _PARQUET_PATH = Path(__file__).resolve().parent.parent.parent / "data" / "processed" / "fact_dispatch_clean.parquet"
+    data_df = pd.read_parquet(_PARQUET_PATH)
 except FileNotFoundError:
     # Fallback for testing: create minimal dataframe
     data_df = pd.DataFrame({
-        'call_year': [2023, 2024],
-        'service': ['EMS', 'Fire'],
-        'description_short': ['Respiratory', 'Trauma']
+        'CALL_YEAR': [2023, 2024],
+        'SERVICE': ['EMS', 'Fire'],
+        'call_type': ['Respiratory', 'Trauma'],
+        'service_type': ['EMS', 'Fire'],
+        'priority_code': ['E1', 'F1'],
+        'priority_description': ['ALS Response', 'Fire Response'],
+        'CALL_QUARTER': ['Q1', 'Q2'],
+        'completeness_score': [0.75, 0.75],
     })
 
 # ── Layout ──

@@ -217,19 +217,24 @@ All 5 contributors set up their domain's scaffolding on Day 1.
 
 ## Phase 4 — Dash Dashboard (Days 7–12)
 
-Each contributor owns specific Dash pages. All share `components/filters.py`.
+**Overview Tab (`pages/overview.py`)**: Designed **separately & collaboratively** as the team's shared landing page containing the core KPIs, EMS vs Fire donut chart (`px.pie`), top-8 incident category bar chart, and the all-services historical line chart.
+*Advanced Chart Additions:*
+- **Sankey Chart** (`go.Sankey`): Visualizing the triage flow of incidents (`Service Type` → `Priority Level` → `Top Call Types`).
+- **Funnel Chart** (`px.funnel`): Visualizing the dispatch lifecycle drop-off (`Total 911 Calls` → `Units Dispatched` → `Arrived on Scene` → `Transported`).
 
-| Contributor | Name | Page(s) | Implementation |
+The remaining 5 specialized tabs are distributed 1:1 among the 5 contributors based on their domain strengths, matching the provided HTML mockup UI exactly:
+
+| Contributor | Name | Tab | Implementation Details (Plotly Dash) |
 |---|---|---|---|
-| **C1** | **Greeshma** | `pages/overview.py` | KPIs tile row (dbc.Card), EMS vs Fire donut (px.pie), top-10 MPDS bar (px.bar), stacked area by year (px.area); reads from Parquet |
-| **C2** | **Suvarna** | `pages/qa.py` | Color-coded agreement DataTable (conditional formatting), data completeness score line chart, response time compliance trend; loads classifier outputs |
-| **C3** | **Sanika** | `pages/geography.py` | Plotly Mapbox choropleth (block-group density), DBSCAN cluster scatter overlay, Response Equity tab (call burden vs poverty scatter); loads cluster Parquet |
-| **C4** | **Srileakhana** | `pages/assistant.py` + `pages/temporal.py` | Chat interface with `dcc.Textarea` + history div, disclaimer, example prompt buttons, source accordion; calls `rag_chain.py` in callback // Quarterly trend line, anomaly `go.Scatter` markers, day-hour heatmap (px.density_heatmap) |
-| **C5** | **Deekshitha** | `pages/forecast.py` + `components/` | 4-quarter forecast with `go.Scatter` uncertainty bands (fill='tonexty'), Prophet/LightGBM/Ensemble `dcc.RadioItems` toggle; loads model artifacts // `filters.py` global dcc.Store, `map_utils.py`, `chat_ui.py` |
+| **C1** | **Greeshma** | `pages/temporal.py` (Temporal) | Builds the Quarter × Year Heatmap (`px.density_heatmap`) showing EMS call volume. Highlights specific cells corresponding to Isolation Forest anomalous spikes. **New:** Adds a **Slope Chart** to visualize rank/volume shifts in top incident categories from 2020 to 2023. |
+| **C2** | **Suvarna** | `pages/qa.py` (QA / Classification) | Builds the Incident Classification QA `dash_table.DataTable` with conditional formatting (Match/Review/Mismatch badges). **New:** Uses a **Bullet Chart** (`go.Indicator`) to track 'Data Completeness' and 'Response Time Compliance' rigidly against the 90% NFPA performance targets. |
+| **C3** | **Sanika** | `pages/geography.py` (Geography) | Builds the Plotly Mapbox choropleth overlaid with DBSCAN hotspot scatter markers (`go.Scattermapbox`), and the Response Equity scatter plot (`px.scatter` poverty vs compliance). |
+| **C4** | **Srileakhana**| `pages/rag.py` (RAG Assistant) | Builds the chat UI with prompt chips, text input, message history pane, and dynamically formats the backend `rag_chain.py` answers with source citations. |
+| **C5** | **Deekshitha**| `pages/forecast.py` (Forecast) | Builds the 4-quarter lookahead line chart with uncertainty bands (`go.Scatter` with `fill='tonexty'`), toggle buttons for Prophet/LightGBM/Ensemble, and quarterly stat tiles. |
 
 **Deployment**: `python src/dashboard/app.py` → Flask dev server on `http://0.0.0.0:8050`
 
-**Milestone**: All 6 pages rendering live data; global filters wired via `dcc.Store`.
+**Milestone**: All 6 pages rendering live data (Overview + 5 specialized tabs); global filters wired via `dcc.Store`.
 
 ---
 

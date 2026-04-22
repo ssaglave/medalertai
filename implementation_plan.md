@@ -217,24 +217,56 @@ All 5 contributors set up their domain's scaffolding on Day 1.
 
 ## Phase 4 — Dash Dashboard (Days 7–12)
 
-**Overview Tab (`pages/overview.py`)**: Designed **separately & collaboratively** as the team's shared landing page containing the core KPIs, EMS vs Fire donut chart (`px.pie`), top-8 incident category bar chart, and the all-services historical line chart.
-*Advanced Chart Additions:*
-- **Sankey Chart** (`go.Sankey`): Visualizing the triage flow of incidents (`Service Type` → `Priority Level` → `Top Call Types`).
-- **Funnel Chart** (`px.funnel`): Visualizing the dispatch lifecycle drop-off (`Total 911 Calls` → `Units Dispatched` → `Arrived on Scene` → `Transported`).
+### Phase 4A — Overview Page (Days 7–8) — All Contributors
 
-The remaining 5 specialized tabs are distributed 1:1 among the 5 contributors based on their domain strengths, matching the provided HTML mockup UI exactly:
+**Lead: Suvarna (C2)** coordinates the implementation while all contributors collaborate.
 
-| Contributor | Name | Tab | Implementation Details (Plotly Dash) |
+`pages/overview.py` is designed **separately & collaboratively** as the team's shared landing page.
+
+**Core Charts:**
+
+| Chart | Plotly API | Description |
+|-------|-----------|-------------|
+| KPI tile row | `dbc.Card` | Total calls, EMS count, Fire count, avg per quarter |
+| EMS vs Fire donut | `px.pie` | Service type distribution |
+| Top-8 incident category bar | `px.bar` | Most frequent MPDS groups |
+| All-services historical line | `px.area` | Stacked area by year |
+
+**Advanced Charts:**
+
+| Chart | Plotly API | Description |
+|-------|-----------|-------------|
+| **Sankey Chart** | `go.Sankey` | Triage flow: Service Type → Priority Level → Top Call Types |
+| **Priority Distribution Funnel** | `px.funnel` | Breakdown by priority levels: Life Threatening → ALS → BLS → Non-Emergency |
+| **Service Pipeline Bar** | `px.bar` (horizontal stacked) | Total calls → Calls with response time → Calls with complete data (using `completeness_score`) |
+
+**Data Source**: Reads from `data/processed/fact_dispatch_clean.parquet`
+
+**Milestone 4A**: Overview page fully rendering with all 7 charts + KPI cards; wired to global filters.
+
+### Phase 4B — Specialized Pages (Days 8–12) — 1:1 Assignment
+
+The remaining 5 pages are distributed 1:1 based on each contributor's domain expertise:
+
+| Contributor | Name | Page | Implementation Details |
 |---|---|---|---|
-| **C1** | **Greeshma** | `pages/temporal.py` (Temporal) | Builds the Quarter × Year Heatmap (`px.density_heatmap`) showing EMS call volume. Highlights specific cells corresponding to Isolation Forest anomalous spikes. **New:** Adds a **Slope Chart** to visualize rank/volume shifts in top incident categories from 2020 to 2023. |
-| **C2** | **Suvarna** | `pages/qa.py` (QA / Classification) | Builds the Incident Classification QA `dash_table.DataTable` with conditional formatting (Match/Review/Mismatch badges). **New:** Uses a **Bullet Chart** (`go.Indicator`) to track 'Data Completeness' and 'Response Time Compliance' rigidly against the 90% NFPA performance targets. |
-| **C3** | **Sanika** | `pages/geography.py` (Geography) | Builds the Plotly Mapbox choropleth overlaid with DBSCAN hotspot scatter markers (`go.Scattermapbox`), and the Response Equity scatter plot (`px.scatter` poverty vs compliance). |
-| **C4** | **Srileakhana**| `pages/rag.py` (RAG Assistant) | Builds the chat UI with prompt chips, text input, message history pane, and dynamically formats the backend `rag_chain.py` answers with source citations. |
-| **C5** | **Deekshitha**| `pages/forecast.py` (Forecast) | Builds the 4-quarter lookahead line chart with uncertainty bands (`go.Scatter` with `fill='tonexty'`), toggle buttons for Prophet/LightGBM/Ensemble, and quarterly stat tiles. |
+| **C1** | **Greeshma** | `pages/temporal.py` (Temporal) | Quarter × Year Heatmap (`px.density_heatmap`) showing EMS call volume. Highlights cells corresponding to Isolation Forest anomalous spikes. **Slope Chart** to visualize rank/volume shifts in top incident categories from 2020 to 2023. |
+| **C2** | **Suvarna** | `pages/qa.py` (Classification QA) | Incident Classification QA `dash_table.DataTable` with conditional formatting (Match/Review/Mismatch badges). **Bullet Chart** (`go.Indicator`) to track Data Completeness and Response Time Compliance against 90% NFPA performance targets. |
+| **C3** | **Sanika** | `pages/geography.py` (Geography) | Plotly Mapbox choropleth overlaid with DBSCAN hotspot scatter markers (`go.Scattermapbox`). Response Equity scatter plot (`px.scatter` poverty vs compliance). |
+| **C4** | **Srileakhana** | `pages/assistant.py` (RAG Assistant) | Chat UI with prompt chips, `dcc.Textarea` input, message history pane, disclaimer. Dynamically formats `rag_chain.py` answers with source citations in accordion. |
+| **C5** | **Deekshitha** | `pages/forecast.py` (Forecast) | 4-quarter lookahead line chart with uncertainty bands (`go.Scatter` with `fill='tonexty'`). Toggle buttons for Prophet/LightGBM/Ensemble (`dcc.RadioItems`). Quarterly stat tiles. |
+
+**Shared Components (C5 — Deekshitha):** Implemented at the start of Phase 4B (Days 8–9) to unblock C3 and C4.
+
+| Component | File | Implementation |
+|-----------|------|----------------|
+| Global Filter Bar | `components/filters.py` | Year multi-select, Service type toggle, MPDS group multi-select → updates `dcc.Store('global-filters')` |
+| Map Utilities | `components/map_utils.py` | Shared Mapbox choropleth builder + DBSCAN cluster scatter overlay helpers (used by `geography.py`) |
+| Chat UI | `components/chat_ui.py` | Chat message display, input textarea, example prompt buttons (used by `assistant.py`) |
 
 **Deployment**: `python src/dashboard/app.py` → Flask dev server on `http://0.0.0.0:8050`
 
-**Milestone**: All 6 pages rendering live data (Overview + 5 specialized tabs); global filters wired via `dcc.Store`.
+**Milestone 4B**: All 5 specialized pages rendering live data; global filters wired via `dcc.Store`.
 
 ---
 
@@ -257,7 +289,9 @@ Day 1 EOD  → config/contracts.py committed (all 5 align on schema)
 Day 3 EOD  → fact_dispatch_clean.parquet ready (C2, C3, C4 unblock for Phase 2)
 Day 5 EOD  → rag_chain.py importable (C4 dashboard page unblocks)
 Day 7 EOD  → models/artifacts/ populated (C1–C5 dashboard callbacks unblock)
-Day 10 EOD → All Dash pages rendering (C5 integration tests unblock)
+Day 8 EOD  → Phase 4A: Overview page complete (Suvarna leads, all contribute)
+Day 8 EOD  → C5 delivers filters.py, map_utils.py, chat_ui.py (unblocks C3, C4)
+Day 10 EOD → Phase 4B: All 5 specialized pages rendering (C5 integration tests unblock)
 Day 13 EOD → All tests green → Phase 5 complete
 ```
 

@@ -42,6 +42,10 @@ log = logging.getLogger("medalertai.forecasting")
 warnings.filterwarnings("ignore")
 
 FORECASTING_ARTIFACTS_DIR = MODEL_ARTIFACTS_DIR / "forecasting"
+MIN_MONTHS_FOR_CV = 24
+CV_INITIAL = "730 days"
+CV_PERIOD = "180 days"
+CV_HORIZON = "365 days"
 
 
 def load_temporal_data() -> pd.DataFrame:
@@ -54,13 +58,23 @@ def load_temporal_data() -> pd.DataFrame:
         
     df = pd.read_parquet(path)
     
-    if "date" in df.columns:
+    if "call_create_time" in df.columns:
+        df["ds"] = pd.to_datetime(df["call_create_time"])
+    elif "date" in df.columns:
         df["ds"] = pd.to_datetime(df["date"])
     else:
         # Fallback using 'year' and 'month' from feature engineering if available
         if "year" in df.columns and "month" in df.columns:
             df["ds"] = pd.to_datetime(
                 df["year"].astype(str) + "-" + df["month"].astype(str).str.zfill(2) + "-01",
+                format="%Y-%m-%d", errors="coerce"
+            )
+        elif "year" in df.columns and "quarter" in df.columns:
+            # Fallback using 'year' and 'quarter' as a last resort
+            month_map = {"Q1": "01", "Q2": "04", "Q3": "07", "Q4": "10"}
+            df["month_str"] = df["quarter"].map(month_map).fillna("01")
+            df["ds"] = pd.to_datetime(
+                df["year"].astype(str) + "-" + df["month_str"] + "-01",
                 format="%Y-%m-%d", errors="coerce"
             )
         else:
@@ -95,7 +109,7 @@ def evaluate_walk_forward(model) -> dict:
     try:
         # 4 quarters ≈ 365 days. 
         # Using initial=2 years (730 days) if data permits.
-        df_cv = cross_validation(model, initial="730 days", period="180 days", horizon="365 days")
+        df_cv = cross_validation(model, initial=CV_INITIAL, period=CV_PERIOD, horizon=CV_HORIZON)
         df_p = performance_metrics(df_cv)
         
         avg_mape = df_p["mape"].mean()
@@ -157,7 +171,7 @@ def run_training(use_mlflow: bool = True, skip_ensemble: bool = False):
 
     ts = load_temporal_data()
     
-    if len(ts) < 24:
+    if len(ts) < MIN_MONTHS_FOR_CV:
         log.warning("Data length (%d months) may be too short for 4-quarter CV.", len(ts))
         
     model = train_prophet_model(ts)

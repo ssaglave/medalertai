@@ -19,6 +19,8 @@ if str(PROJECT_ROOT) not in sys.path:
 import dash
 from dash import Dash, html, dcc
 import dash_bootstrap_components as dbc
+import pandas as pd
+from src.dashboard.components.filters import create_filter_bar
 
 app = Dash(
     __name__,
@@ -35,6 +37,23 @@ app.title = "MedAlertAI"
 
 # Expose the underlying Flask server
 server = app.server
+
+# Load data for filter initialization
+try:
+    _PARQUET_PATH = Path(__file__).resolve().parent.parent.parent / "data" / "processed" / "fact_dispatch_clean.parquet"
+    data_df = pd.read_parquet(_PARQUET_PATH)
+except FileNotFoundError:
+    # Fallback for testing: create minimal dataframe
+    data_df = pd.DataFrame({
+        'CALL_YEAR': [2023, 2024],
+        'SERVICE': ['EMS', 'Fire'],
+        'call_type': ['Respiratory', 'Trauma'],
+        'service_type': ['EMS', 'Fire'],
+        'priority_code': ['E1', 'F1'],
+        'priority_description': ['ALS Response', 'Fire Response'],
+        'CALL_QUARTER': ['Q1', 'Q2'],
+        'completeness_score': [0.75, 0.75],
+    })
 
 # ── Layout ──
 app.layout = dbc.Container([
@@ -54,8 +73,8 @@ app.layout = dbc.Container([
         ],
     ),
 
-    # Global filter store
-    dcc.Store(id="global-filters", data={}),
+    # Global Filter Bar (Critical Blocker — C5)
+    create_filter_bar(data_df),
 
     # Page content
     html.Div(dash.page_container, className="mt-3"),

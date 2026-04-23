@@ -256,14 +256,14 @@ def _build_heatmap(filters: dict) -> go.Figure:
             )
         )
 
+    fig.update_layout(**PLOTLY_LAYOUT)
+    fig.update_xaxes(tickmode="linear", gridcolor=GRID_COLOR)
+    fig.update_yaxes(
+        categoryorder="array",
+        categoryarray=["Q1", "Q2", "Q3", "Q4"],
+        gridcolor=GRID_COLOR,
+    )
     fig.update_layout(
-        **PLOTLY_LAYOUT,
-        yaxis=dict(
-            categoryorder="array",
-            categoryarray=["Q1", "Q2", "Q3", "Q4"],
-            gridcolor=GRID_COLOR,
-        ),
-        xaxis=dict(tickmode="linear", gridcolor=GRID_COLOR),
         coloraxis_colorbar=dict(title="Calls", tickfont=dict(color=FONT_COLOR)),
         legend=dict(font=dict(color=FONT_COLOR)),
     )
@@ -353,19 +353,21 @@ def _build_slope_chart(filters: dict) -> go.Figure:
             )
         )
 
+    fig.update_layout(**PLOTLY_LAYOUT)
+    fig.update_xaxes(
+        tickvals=[year_min, year_max],
+        ticktext=[str(year_min), str(year_max)],
+        range=[year_min - 0.6, year_max + 0.6],
+        gridcolor=GRID_COLOR,
+    )
+    fig.update_yaxes(
+        title="Call Volume",
+        gridcolor=GRID_COLOR,
+    )
     fig.update_layout(
-        **PLOTLY_LAYOUT,
         title=f"Top Incident Categories - Volume Shift {year_min} to {year_max}",
-        xaxis=dict(
-            tickvals=[year_min, year_max],
-            ticktext=[str(year_min), str(year_max)],
-            range=[year_min - 0.6, year_max + 0.6],
-            gridcolor=GRID_COLOR,
-        ),
-        yaxis=dict(title="Call Volume", gridcolor=GRID_COLOR),
         showlegend=False,
     )
-
     return fig
 
 

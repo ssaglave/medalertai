@@ -100,6 +100,23 @@ REQUIRED_COLUMNS: list[str] = [
     "census_block_group_center__y",
 ]
 
+# Post-rename canonical columns used for completeness scoring.
+# These match the NEMSIS v3 names that exist in the final Parquet.
+CANONICAL_QUALITY_COLUMNS: list[str] = [
+    "incident_id",            # was call_id_hash
+    "service_type",           # was service
+    "priority_code",          # was priority
+    "priority_description",   # was priority_desc
+    "CALL_QUARTER",           # kept as-is (uppercase)
+    "CALL_YEAR",              # kept as-is (uppercase)
+    "call_type",              # was description_short
+    "city_code",
+    "city_name",
+    "census_block_group",     # was geoid
+    "longitude",              # was census_block_group_center__x
+    "latitude",               # was census_block_group_center__y
+]
+
 # Canonical dtypes for the Parquet schema
 PARQUET_DTYPES: dict[str, str] = {
     "call_id_hash":                 "string",
@@ -264,14 +281,27 @@ def _apply_dtypes(df: pd.DataFrame) -> pd.DataFrame:
     return df
 
 
-def _compute_completeness_score(df: pd.DataFrame) -> pd.DataFrame:
+def _compute_completeness_score(
+    df: pd.DataFrame,
+    columns: list[str] | None = None,
+) -> pd.DataFrame:
     """
     Add a 'completeness_score' column (0.0–1.0) per row,
-    based on how many of the REQUIRED_COLUMNS are non-null.
+    based on how many of the given columns are non-null.
+
+    Parameters
+    ----------
+    df       : DataFrame to score
+    columns  : Column list to check (defaults to REQUIRED_COLUMNS)
     """
-    req = [c for c in REQUIRED_COLUMNS if c in df.columns]
+    target_cols = columns or REQUIRED_COLUMNS
+    req = [c for c in target_cols if c in df.columns]
+    if not req:
+        log.warning("  No quality columns found for completeness scoring.")
+        df["completeness_score"] = np.float32(0.0)
+        return df
     df["completeness_score"] = (
-        df[req].notna().sum(axis=1) / len(req)
+        df[req].notna().sum(axis=1) / len(target_cols)
     ).round(3).astype("float32")
     return df
 
@@ -413,6 +443,13 @@ def run_pipeline(
     rename_map = {k: v for k, v in COLUMN_MAPPING.items() if k in combined.columns}
     combined = combined.rename(columns=rename_map)
     log.info("  Renamed %d columns to NEMSIS v3 canonical names.", len(rename_map))
+
+    # --- Recompute completeness_score using post-rename canonical columns ---
+    # The pre-rename score was inaccurate because 3 columns (incident_id,
+    # quarter, year) became ALL-NULL after the NEMSIS rename.
+    combined = _compute_completeness_score(combined, CANONICAL_QUALITY_COLUMNS)
+    post_avg = combined["completeness_score"].mean()
+    log.info("  Recomputed completeness_score (post-rename): avg=%.1f%%", post_avg * 100)
 
     # --- Convert quarter from int (1–4) to string ("Q1"–"Q4") ---
     _quarter_map = {1: "Q1", 2: "Q2", 3: "Q3", 4: "Q4"}

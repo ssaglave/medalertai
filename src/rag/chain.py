@@ -1,12 +1,12 @@
 """
 src/rag/chain.py
 
-Phase 3 - LangChain RetrievalQA chain with Claude.
+Phase 3 - LangChain RetrievalQA chain with Ollama.
 Owner: Srileakhana (C4)
 
 Responsibilities covered here:
   - Build a protocol-only RetrievalQA chain over the ChromaDB retriever.
-  - Use Claude Haiku by default when an Anthropic API key is configured.
+  - Use a local Ollama chat model by default when the Ollama server is running.
   - Return citation-ready source metadata for dashboard callbacks and tests.
 
 Usage from the repo root after running ingestion/vectorstore setup:
@@ -20,12 +20,13 @@ import os
 from dataclasses import dataclass
 from typing import Any, Iterable
 
-from config.settings import ANTHROPIC_API_KEY
+from config.settings import OLLAMA_BASE_URL, OLLAMA_MODEL
 
 
 log = logging.getLogger("medalertai.rag.chain")
 
-DEFAULT_MODEL = os.getenv("ANTHROPIC_MODEL", "claude-haiku-4-5")
+DEFAULT_MODEL = os.getenv("OLLAMA_MODEL", OLLAMA_MODEL)
+DEFAULT_OLLAMA_BASE_URL = os.getenv("OLLAMA_BASE_URL", OLLAMA_BASE_URL)
 DEFAULT_TOP_K = int(os.getenv("RAG_TOP_K", "5"))
 FALLBACK_ANSWER = (
     "I do not have enough protocol context in the retrieved sources to answer "
@@ -102,25 +103,23 @@ def build_prompt():
 
 
 def get_llm(model: str = DEFAULT_MODEL, temperature: float = 0.0):
-    """Return the Claude chat model used by the RAG chain."""
-    api_key = ANTHROPIC_API_KEY or os.getenv("ANTHROPIC_API_KEY", "")
-    if not api_key:
-        raise RagChainError("ANTHROPIC_API_KEY is required to query Claude.")
-
+    """Return the Ollama chat model used by the RAG chain."""
     try:
-        from langchain_anthropic import ChatAnthropic
-    except ImportError as exc:
-        raise RagChainError(
-            "langchain-anthropic is required for Claude RetrievalQA. "
-            "Install requirements.txt before running the RAG assistant."
-        ) from exc
+        from langchain_ollama import ChatOllama
+    except ImportError:
+        try:
+            from langchain_community.chat_models import ChatOllama
+        except ImportError as exc:
+            raise RagChainError(
+                "An Ollama chat integration is required for RetrievalQA. "
+                "Install requirements.txt before running the RAG assistant."
+            ) from exc
 
-    return ChatAnthropic(
+    return ChatOllama(
         model=model,
-        anthropic_api_key=api_key,
+        base_url=DEFAULT_OLLAMA_BASE_URL,
         temperature=temperature,
-        timeout=30,
-        max_retries=2,
+        num_predict=512,
     )
 
 
@@ -150,8 +149,11 @@ def build_qa_chain(
     """Build a LangChain RetrievalQA chain over the configured retriever."""
     try:
         from langchain.chains import RetrievalQA
-    except ImportError as exc:
-        raise RagChainError("LangChain is required to build RetrievalQA.") from exc
+    except ImportError:
+        try:
+            from langchain_classic.chains import RetrievalQA
+        except ImportError as exc:
+            raise RagChainError("LangChain is required to build RetrievalQA.") from exc
 
     chain_llm = llm or get_llm()
     chain_retriever = retriever or get_retriever(k=k)

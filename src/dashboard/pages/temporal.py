@@ -160,7 +160,7 @@ def _selected_years(df: pd.DataFrame, filters: dict) -> list:
 
 
 def _selected_services(filters: dict) -> list[str]:
-    selected = filters.get("service") or filters.get("service_type")
+    selected = filters.get("services") or filters.get("service_type")
     if selected:
         return selected
     return ["EMS", "Fire"]

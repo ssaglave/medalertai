@@ -1,12 +1,12 @@
 """
 src/rag/chain.py
 
-Phase 3 - LangChain RetrievalQA chain with Claude.
+Phase 3 - LangChain RetrievalQA chain with Hugging Face inference.
 Owner: Srileakhana (C4)
 
 Responsibilities covered here:
   - Build a protocol-only RetrievalQA chain over the ChromaDB retriever.
-  - Use Claude Haiku by default when an Anthropic API key is configured.
+  - Use a Hugging Face inference endpoint by default when a token is configured.
   - Return citation-ready source metadata for dashboard callbacks and tests.
 
 Usage from the repo root after running ingestion/vectorstore setup:
@@ -17,20 +17,33 @@ from __future__ import annotations
 
 import logging
 import os
+import re
 from dataclasses import dataclass
 from typing import Any, Iterable
 
-from config.settings import ANTHROPIC_API_KEY
+# Strips any leftover "[source: ...; chunk: N]" markers the LLM may emit
+# despite the prompt instruction not to.
+_CITATION_MARKER_RE = re.compile(r"\s*\[source:[^\]]*\]\s*", re.IGNORECASE)
+
+from config.settings import HUGGINGFACE_API_TOKEN, HUGGINGFACE_ENDPOINT_URL, HUGGINGFACE_MODEL
 
 
 log = logging.getLogger("medalertai.rag.chain")
 
-DEFAULT_MODEL = os.getenv("ANTHROPIC_MODEL", "claude-haiku-4-5")
+DEFAULT_MODEL = os.getenv("HUGGINGFACE_MODEL", HUGGINGFACE_MODEL)
+DEFAULT_HF_ENDPOINT_URL = os.getenv("HUGGINGFACE_ENDPOINT_URL", HUGGINGFACE_ENDPOINT_URL)
 DEFAULT_TOP_K = int(os.getenv("RAG_TOP_K", "5"))
 FALLBACK_ANSWER = (
-    "I do not have enough protocol context in the retrieved sources to answer "
-    "that safely. Please consult the official EMS protocol or a qualified "
-    "clinical/dispatch supervisor."
+    "I could not find an answer to that in the indexed knowledge base. "
+    "This assistant only uses the documents currently ingested into the RAG "
+    "corpus, which covers:\n\n"
+    "- Medical Priority Dispatch System (MPDS) protocol concepts and structure\n"
+    "- Pittsburgh EMS/Fire dispatch call types and their mapping to MPDS codes\n"
+    "- NEMSIS v3 data dictionary and reference fields\n\n"
+    "Try rephrasing your question around those topics. For anything outside "
+    "this scope (state-specific protocols, individual MPDS dispatch codes not "
+    "yet ingested, etc.), consult the official protocol document or a "
+    "qualified clinical/dispatch supervisor."
 )
 
 SYSTEM_PROMPT = """You are MedAlertAI's EMS and fire dispatch protocol assistant.
@@ -42,8 +55,9 @@ provide medical direction beyond what the retrieved context supports.
 If the context does not contain the answer, say exactly:
 "{fallback_answer}"
 
-When you answer, include concise citations in this format:
-[source: <title or source_id>; chunk: <chunk_index>]
+Do not include source citations, chunk markers, or text like
+"[source: ...; chunk: N]" in your answer; the user sees the sources separately
+in the dashboard.
 
 Retrieved context:
 {context}
@@ -55,6 +69,63 @@ Answer:"""
 
 class RagChainError(RuntimeError):
     """Raised when the RAG chain cannot be created or queried."""
+
+
+try:
+    from langchain_core.language_models.llms import LLM
+except ImportError as exc:
+    raise RuntimeError("LangChain core is required for the RAG chain.") from exc
+
+
+class HuggingFaceInferenceLLM(LLM):
+    """Small adapter that exposes Hugging Face text generation to LangChain RetrievalQA."""
+
+    def __init__(
+        self,
+        model: str,
+        api_token: str,
+        endpoint_url: str = "",
+        temperature: float = 0.0,
+        max_new_tokens: int = 512,
+    ) -> None:
+        try:
+            from huggingface_hub import InferenceClient
+        except ImportError as exc:
+            raise RagChainError(
+                "huggingface-hub is required for Hugging Face inference."
+            ) from exc
+
+        client_kwargs = {"token": api_token, "timeout": 60}
+        if endpoint_url:
+            client_kwargs["base_url"] = endpoint_url
+        else:
+            client_kwargs["model"] = model
+
+        super().__init__()
+        self._client = InferenceClient(**client_kwargs)
+        self._model = model
+        self._temperature = temperature
+        self._max_new_tokens = max_new_tokens
+
+    @property
+    def _llm_type(self) -> str:
+        return "huggingface_inference"
+
+    def invoke(self, prompt: str, **kwargs: Any) -> str:
+        stop = kwargs.get("stop")
+        return self._call(prompt, stop=stop)
+
+    def _call(self, prompt: str, stop: list[str] | None = None, **_: Any) -> str:
+        response = self._client.chat_completion(
+            messages=[{"role": "user", "content": prompt}],
+            max_tokens=self._max_new_tokens,
+            temperature=self._temperature,
+            stop=stop,
+        )
+        try:
+            return response.choices[0].message.content.strip()
+        except (AttributeError, IndexError, KeyError, TypeError):
+            return str(response).strip()
 
 
 @dataclass(frozen=True)
@@ -102,25 +173,16 @@ def build_prompt():
 
 
 def get_llm(model: str = DEFAULT_MODEL, temperature: float = 0.0):
-    """Return the Claude chat model used by the RAG chain."""
-    api_key = ANTHROPIC_API_KEY or os.getenv("ANTHROPIC_API_KEY", "")
-    if not api_key:
-        raise RagChainError("ANTHROPIC_API_KEY is required to query Claude.")
-
-    try:
-        from langchain_anthropic import ChatAnthropic
-    except ImportError as exc:
-        raise RagChainError(
-            "langchain-anthropic is required for Claude RetrievalQA. "
-            "Install requirements.txt before running the RAG assistant."
-        ) from exc
-
-    return ChatAnthropic(
+    """Return the Hugging Face inference model used by the RAG chain."""
+    api_token = HUGGINGFACE_API_TOKEN or os.getenv("HUGGINGFACE_API_TOKEN", "")
+    if not api_token:
+        raise RagChainError("HUGGINGFACE_API_TOKEN is required to query the Hugging Face endpoint.")
+    return HuggingFaceInferenceLLM(
         model=model,
-        anthropic_api_key=api_key,
+        api_token=api_token,
+        endpoint_url=DEFAULT_HF_ENDPOINT_URL,
         temperature=temperature,
-        timeout=30,
-        max_retries=2,
+        max_new_tokens=512,
     )
 
 
@@ -150,8 +212,11 @@ def build_qa_chain(
     """Build a LangChain RetrievalQA chain over the configured retriever."""
     try:
         from langchain.chains import RetrievalQA
-    except ImportError as exc:
-        raise RagChainError("LangChain is required to build RetrievalQA.") from exc
+    except ImportError:
+        try:
+            from langchain_classic.chains import RetrievalQA
+        except ImportError as exc:
+            raise RagChainError("LangChain is required to build RetrievalQA.") from exc
 
     chain_llm = llm or get_llm()
     chain_retriever = retriever or get_retriever(k=k)
@@ -189,6 +254,7 @@ def query(
         raise RagChainError(f"RAG query failed: {exc}") from exc
 
     answer = _extract_answer(raw_result)
+    answer = _CITATION_MARKER_RE.sub(" ", answer).strip()
     documents = raw_result.get("source_documents", []) if isinstance(raw_result, dict) else []
     citations = citations_from_documents(documents)
 

@@ -2,21 +2,21 @@
   "engine": "HistGradientBoosting",
   "validation": {
     "split": "validation",
-    "accuracy": 1.0,
-    "macro_f1": 1.0,
-    "weighted_f1": 1.0,
-    "macro_precision": 1.0,
-    "macro_recall": 1.0
+    "accuracy": 0.4868,
+    "macro_f1": 0.1707,
+    "weighted_f1": 0.447,
+    "macro_precision": 0.2826,
+    "macro_recall": 0.1748
   },
   "test": {
     "split": "test",
-    "accuracy": 1.0,
-    "macro_f1": 0.9999,
-    "weighted_f1": 1.0,
-    "macro_precision": 0.9998,
-    "macro_recall": 1.0
+    "accuracy": 0.4868,
+    "macro_f1": 0.1711,
+    "weighted_f1": 0.4468,
+    "macro_precision": 0.2804,
+    "macro_recall": 0.1748
   },
   "n_classes": 31,
   "n_train_rows": 2313502,
-  "training_time_sec": 294.6
+  "training_time_sec": 558.2
 }

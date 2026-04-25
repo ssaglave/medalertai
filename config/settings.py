@@ -26,7 +26,9 @@ MODEL_ARTIFACTS_DIR = PROJECT_ROOT / os.getenv("MODEL_ARTIFACTS_DIR", "models/ar
 CHROMA_PERSIST_DIR = PROJECT_ROOT / os.getenv("CHROMA_PERSIST_DIR", "chroma_db")
 
 # ── API Keys ──
-ANTHROPIC_API_KEY = os.getenv("ANTHROPIC_API_KEY", "")
+HUGGINGFACE_API_TOKEN = os.getenv("HUGGINGFACE_API_TOKEN", "")
+HUGGINGFACE_ENDPOINT_URL = os.getenv("HUGGINGFACE_ENDPOINT_URL", "")
+HUGGINGFACE_MODEL = os.getenv("HUGGINGFACE_MODEL", "meta-llama/Llama-3.1-8B-Instruct:novita")
 
 # ── Model Defaults ──
 CLASSIFIER_TARGET = "mpds_group"

@@ -13,12 +13,10 @@ Responsibilities:
 
 Task:
   Predict the MPDS complaint group (`mpds_group`) for each dispatch record
-  using dispatch metadata features (priority, service type, location, time)
-  PLUS the raw call_type description as an ordinal-encoded feature.
-
-  This is a classification QA task — the model learns the expected mapping
-  from raw call metadata → MPDS groups, and flags records where the
-  assignment disagrees with the model's confident prediction.
+  using dispatch metadata features (priority, service type, location, time).
+  NOTE: `call_type` is EXCLUDED from features because the target
+  (`mpds_group`) is deterministically derived from it via mpds_mapper,
+  which would cause data leakage and trivial 100% accuracy.
 
 Engine priority:
   1. LightGBM (if available + libomp installed)
@@ -92,10 +90,12 @@ CLASSIFIER_ARTIFACTS_DIR = MODEL_ARTIFACTS_DIR / "classifier"
 # ---------------------------------------------------------------------------
 # Feature definitions
 # ---------------------------------------------------------------------------
-# call_type (raw description) is the key feature — the model learns the
-# expected mapping from description + metadata → MPDS group.
+# NOTE: call_type is intentionally EXCLUDED from features because the target
+# (mpds_group) is derived deterministically from call_type via mpds_mapper.
+# Including it would cause data leakage → trivial 100% accuracy.
+# The classifier should learn the mapping from dispatch metadata only,
+# enabling it to flag records where metadata doesn't match the MPDS label.
 CATEGORICAL_FEATURES = [
-    "call_type",            # raw description (e.g., "SICK", "FALL")
     "priority_code",
     "priority_description",
     "quarter",

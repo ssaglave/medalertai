@@ -17,6 +17,7 @@ Usage from the repo root:
 import json
 import logging
 from pathlib import Path
+from typing import Any
 
 from langchain_community.vectorstores import Chroma
 from langchain_community.embeddings import HuggingFaceEmbeddings
@@ -44,7 +45,7 @@ def load_chunks_from_jsonl(path: Path = CHUNKS_PATH) -> list[Document]:
             data = json.loads(line)
             # data structure matches what was created in src/rag/ingest.py
             page_content = data.get("text", "")
-            metadata = data.get("metadata", {})
+            metadata = _flatten_metadata(data.get("metadata", {}))
             
             # include essential chunk IDs in metadata
             metadata["chunk_id"] = data.get("chunk_id", "")
@@ -57,6 +58,31 @@ def load_chunks_from_jsonl(path: Path = CHUNKS_PATH) -> list[Document]:
             
     log.info("Loaded %d documents from %s", len(documents), path)
     return documents
+
+
+def _flatten_metadata(metadata: dict[str, Any]) -> dict[str, Any]:
+    """Convert nested metadata into Chroma-safe flat scalar metadata."""
+    flattened: dict[str, Any] = {}
+
+    for key, value in metadata.items():
+        if isinstance(value, dict):
+            for nested_key, nested_value in value.items():
+                flattened[f"{key}_{nested_key}"] = _coerce_metadata_value(nested_value)
+        else:
+            flattened[key] = _coerce_metadata_value(value)
+
+    return flattened
+
+
+def _coerce_metadata_value(value: Any) -> Any:
+    if isinstance(value, (str, int, float, bool)) or value is None:
+        return value
+    if isinstance(value, list):
+        return [
+            item if isinstance(item, (str, int, float, bool)) or item is None else str(item)
+            for item in value
+        ]
+    return str(value)
 
 
 def get_embeddings_model() -> HuggingFaceEmbeddings:

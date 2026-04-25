@@ -38,21 +38,30 @@ app.title = "MedAlertAI"
 # Expose the underlying Flask server
 server = app.server
 
-# Load data for filter initialization
-try:
-    _PARQUET_PATH = Path(__file__).resolve().parent.parent.parent / "data" / "processed" / "fact_dispatch_clean.parquet"
-    data_df = pd.read_parquet(_PARQUET_PATH)
-except FileNotFoundError:
-    # Fallback for testing: create minimal dataframe
+# Load data for filter initialization. The filter bar only needs unique
+# year / service / call_type values, so read the small overview aggregate
+# (~100 KB) instead of the 134 MB raw fact table. Fall back to a
+# column-subset read of the raw parquet, then a tiny synthetic frame.
+_PROCESSED_DIR = Path(__file__).resolve().parent.parent.parent / "data" / "processed"
+_OVERVIEW_AGG = _PROCESSED_DIR / "overview_agg.parquet"
+_FACT_PARQUET = _PROCESSED_DIR / "fact_dispatch_clean.parquet"
+
+if _OVERVIEW_AGG.exists():
+    _agg = pd.read_parquet(
+        _OVERVIEW_AGG, columns=["year", "service", "call_type"]
+    )
+    data_df = _agg.rename(
+        columns={"year": "CALL_YEAR", "service": "service_type"}
+    )
+elif _FACT_PARQUET.exists():
+    data_df = pd.read_parquet(
+        _FACT_PARQUET, columns=["CALL_YEAR", "service_type", "call_type"]
+    )
+else:
     data_df = pd.DataFrame({
         'CALL_YEAR': [2023, 2024],
-        'SERVICE': ['EMS', 'Fire'],
-        'call_type': ['Respiratory', 'Trauma'],
         'service_type': ['EMS', 'Fire'],
-        'priority_code': ['E1', 'F1'],
-        'priority_description': ['ALS Response', 'Fire Response'],
-        'CALL_QUARTER': ['Q1', 'Q2'],
-        'completeness_score': [0.75, 0.75],
+        'call_type': ['Respiratory', 'Trauma'],
     })
 
 # ── Layout ──

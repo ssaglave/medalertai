@@ -11,13 +11,15 @@ Charts / Components:
   3. Equity Tab — Response-equity scatter (city call burden vs avg completeness_score)
                   + City-level summary table
 
-Data sources:
-  - data/processed/fact_dispatch_clean.parquet   (main dispatch data)
-  - data/processed/dim_cbg_demographics.parquet  (optional demographics)
-  - models/artifacts/clustering/hotspots.parquet (optional pre-computed clusters)
+Data sources (built by scripts/build_geography_aggregates.py):
+  - data/processed/geo_density_agg.parquet
+      per (year, service, call_type, census_block_group): call_count + lat/lon centroid
+  - data/processed/geo_city_agg.parquet
+      per (year, service, city_name): call_count + completeness sum/count
+  - data/processed/geo_call_type_cbg_agg.parquet
+      per (year, service, call_type): total_calls + unique_cbg_count
 """
 
-import sys
 from pathlib import Path
 
 import dash
@@ -33,30 +35,53 @@ dash.register_page(__name__, path="/geography", name="Geography", order=2)
 
 # ── Paths ──
 _REPO_ROOT = Path(__file__).resolve().parent.parent.parent.parent
-_PARQUET    = _REPO_ROOT / "data" / "processed" / "fact_dispatch_clean.parquet"
-_DEMO_PATH  = _REPO_ROOT / "data" / "processed" / "dim_cbg_demographics.parquet"
-_HOTSPOT    = _REPO_ROOT / "models" / "artifacts" / "clustering" / "hotspots.parquet"
+_DENSITY_AGG = _REPO_ROOT / "data" / "processed" / "geo_density_agg.parquet"
+_CITY_AGG = _REPO_ROOT / "data" / "processed" / "geo_city_agg.parquet"
+_CALL_TYPE_AGG = _REPO_ROOT / "data" / "processed" / "geo_call_type_cbg_agg.parquet"
 
-# ── Data Loading ──
-try:
-    DF = pd.read_parquet(_PARQUET)
-    # Ensure expected columns exist
-    for col in ("CALL_YEAR", "service_type", "call_type",
-                "latitude", "longitude", "completeness_score"):
-        if col not in DF.columns:
-            DF[col] = np.nan
-except FileNotFoundError:
-    DF = pd.DataFrame()
+# ── Cached aggregate frames ──
+_density_cache: pd.DataFrame | None = None
+_city_cache: pd.DataFrame | None = None
+_call_type_cache: pd.DataFrame | None = None
 
-try:
-    DEMO_DF = pd.read_parquet(_DEMO_PATH)
-except FileNotFoundError:
-    DEMO_DF = pd.DataFrame()
 
-try:
-    HOTSPOT_DF = pd.read_parquet(_HOTSPOT)
-except FileNotFoundError:
-    HOTSPOT_DF = pd.DataFrame()
+def _load_density_agg() -> pd.DataFrame:
+    global _density_cache
+    if _density_cache is None:
+        if _DENSITY_AGG.exists():
+            _density_cache = pd.read_parquet(_DENSITY_AGG)
+        else:
+            _density_cache = pd.DataFrame(
+                columns=["year", "service", "call_type", "census_block_group",
+                         "call_count", "latitude", "longitude"]
+            )
+    return _density_cache
+
+
+def _load_city_agg() -> pd.DataFrame:
+    global _city_cache
+    if _city_cache is None:
+        if _CITY_AGG.exists():
+            _city_cache = pd.read_parquet(_CITY_AGG)
+        else:
+            _city_cache = pd.DataFrame(
+                columns=["year", "service", "city_name", "call_count",
+                         "completeness_sum", "completeness_count"]
+            )
+    return _city_cache
+
+
+def _load_call_type_agg() -> pd.DataFrame:
+    global _call_type_cache
+    if _call_type_cache is None:
+        if _CALL_TYPE_AGG.exists():
+            _call_type_cache = pd.read_parquet(_CALL_TYPE_AGG)
+        else:
+            _call_type_cache = pd.DataFrame(
+                columns=["year", "service", "call_type", "total_calls", "unique_cbg_count"]
+            )
+    return _call_type_cache
+
 
 # Pittsburgh default centre
 _PGH_LAT, _PGH_LON = 40.4406, -79.9959
@@ -82,43 +107,78 @@ CLUSTER_PALETTE = [
 
 
 # ═══════════════════════════════════════════════════════════════
-# Helpers
+# Filter helpers
 # ═══════════════════════════════════════════════════════════════
 
-def _apply_filters(df: pd.DataFrame, filters: dict) -> pd.DataFrame:
-    """Apply global filter store selections."""
-    if not filters or df.empty:
-        return df
-    years      = filters.get("years", [])
-    services   = filters.get("services", [])
-    call_types = filters.get("call_types", [])
+def _mask_for(df: pd.DataFrame, filters: dict, with_call_type: bool) -> pd.Series:
+    if df.empty:
+        return pd.Series([], dtype=bool)
+    filters = filters or {}
+    years = filters.get("years") or []
+    services = filters.get("services") or []
+    call_types = filters.get("call_types") or []
 
     mask = pd.Series(True, index=df.index)
     if years:
-        col = "CALL_YEAR" if "CALL_YEAR" in df.columns else "year"
-        if col in df.columns:
-            mask &= df[col].isin(years)
-    if services and "service_type" in df.columns:
-        mask &= df["service_type"].isin(services)
-    if call_types and "call_type" in df.columns:
+        mask &= df["year"].isin(years)
+    if services and "service" in df.columns:
+        mask &= df["service"].isin(services)
+    if with_call_type and call_types and "call_type" in df.columns:
         mask &= df["call_type"].isin(call_types)
-    return df[mask]
+    return mask
 
 
-def _geo_df(df: pd.DataFrame) -> pd.DataFrame:
-    """Return rows that have valid lat/lon."""
+def _filtered_density(filters: dict) -> pd.DataFrame:
+    df = _load_density_agg()
     if df.empty:
         return df
-    return df.dropna(subset=["latitude", "longitude"])
+    return df[_mask_for(df, filters, with_call_type=True)]
 
+
+def _cbg_centroids(filtered_density: pd.DataFrame) -> pd.DataFrame:
+    """Roll up the (year,service,call_type,CBG) density to per-CBG totals."""
+    if filtered_density.empty:
+        return filtered_density
+    return (
+        filtered_density.groupby("census_block_group", observed=True)
+        .agg(
+            call_count=("call_count", "sum"),
+            latitude=("latitude", "mean"),
+            longitude=("longitude", "mean"),
+        )
+        .reset_index()
+    )
+
+
+def _filtered_city(filters: dict) -> pd.DataFrame:
+    df = _load_city_agg()
+    if df.empty:
+        return df
+    # call_types filter is not honoured on city aggregate (no call_type dimension);
+    # the filter still applies on the density side.
+    return df[_mask_for(df, filters, with_call_type=False)]
+
+
+def _filtered_call_type(filters: dict) -> pd.DataFrame:
+    df = _load_call_type_agg()
+    if df.empty:
+        return df
+    return df[_mask_for(df, filters, with_call_type=True)]
+
+
+# ═══════════════════════════════════════════════════════════════
+# Helpers
+# ═══════════════════════════════════════════════════════════════
 
 def _dbscan_clusters(geo: pd.DataFrame, eps: float = 0.03,
                      min_samples: int = 5) -> pd.Series:
-    """Run DBSCAN on lat/lon and return cluster labels."""
+    """DBSCAN on CBG centroids (≤ ~1100 points). Returns cluster labels per row."""
+    if geo.empty:
+        return pd.Series([], dtype=int)
     try:
         from sklearn.cluster import DBSCAN
-        coords  = geo[["latitude", "longitude"]].values
-        labels  = DBSCAN(eps=eps, min_samples=min_samples).fit_predict(coords)
+        coords = geo[["latitude", "longitude"]].values
+        labels = DBSCAN(eps=eps, min_samples=min_samples).fit_predict(coords)
         return pd.Series(labels, index=geo.index)
     except Exception:
         return pd.Series(-1, index=geo.index)
@@ -161,26 +221,33 @@ def _kpi_card(title: str, value, icon: str, color: str,
 # Chart builders
 # ═══════════════════════════════════════════════════════════════
 
-def _build_kpi_row(df: pd.DataFrame) -> dbc.Row:
-    """4 KPI tiles: CBGs, calls w/ coords, hotspot clusters, equity score."""
-    geo = _geo_df(df)
+def _build_kpi_row(filters: dict) -> dbc.Row:
+    density = _filtered_density(filters)
+    city = _filtered_city(filters)
+    centroids = _cbg_centroids(density)
 
-    n_cbg = df["census_block_group"].nunique() if "census_block_group" in df.columns else 0
-    n_geo = len(geo)
+    n_cbg = len(centroids)
+    n_geo = int(density["call_count"].sum()) if not density.empty else 0
 
-    # Hotspot clusters (excluding noise label -1)
-    if not geo.empty:
-        labels = _dbscan_clusters(geo)
-        n_clusters = int((labels >= 0).any() and labels[labels >= 0].nunique())
+    if not centroids.empty:
+        labels = _dbscan_clusters(centroids)
+        n_clusters = int(labels[labels >= 0].nunique())
     else:
         n_clusters = 0
 
-    # Equity score — coefficient of variation of per-city completeness (lower = more equitable)
-    if not df.empty and "completeness_score" in df.columns and "city_name" in df.columns:
-        city_scores = df.groupby("city_name")["completeness_score"].mean()
-        equity = 1 - (city_scores.std() / max(city_scores.mean(), 1e-6))
-        equity = max(0.0, min(1.0, equity))
-        equity_str = f"{equity:.2%}"
+    if not city.empty and city["completeness_count"].sum() > 0:
+        per_city = city.groupby("city_name").agg(
+            comp_sum=("completeness_sum", "sum"),
+            comp_n=("completeness_count", "sum"),
+        )
+        per_city = per_city[per_city["comp_n"] > 0]
+        per_city["mean"] = per_city["comp_sum"] / per_city["comp_n"]
+        if len(per_city) > 1 and per_city["mean"].mean() > 0:
+            equity = 1 - (per_city["mean"].std() / per_city["mean"].mean())
+            equity = max(0.0, min(1.0, equity))
+            equity_str = f"{equity:.2%}"
+        else:
+            equity_str = "N/A"
     else:
         equity_str = "N/A"
 
@@ -197,13 +264,9 @@ def _build_kpi_row(df: pd.DataFrame) -> dbc.Row:
 
 
 # ── Map: density bubble + DBSCAN overlay ─────────────────────────
-def _build_density_map(df: pd.DataFrame) -> go.Figure:
-    """
-    Call-density bubble map.
-    Each point = census block group centroid; size = call count.
-    DBSCAN hotspot clusters overlaid in bright colours.
-    """
-    geo = _geo_df(df)
+def _build_density_map(filters: dict) -> go.Figure:
+    density = _filtered_density(filters)
+    geo = _cbg_centroids(density)
 
     fig = go.Figure()
 
@@ -220,40 +283,22 @@ def _build_density_map(df: pd.DataFrame) -> go.Figure:
         )
         return fig
 
-    # ── Layer 1: call density per location ──
-    grp_col = "census_block_group" if "census_block_group" in geo.columns else None
-    if grp_col:
-        agg = (geo.groupby(grp_col)
-               .agg(call_count=(grp_col, "count"),
-                    lat=("latitude",  "mean"),
-                    lon=("longitude", "mean"))
-               .reset_index())
-    else:
-        # Fallback: round lat/lon to 3 dp as proxy location key
-        geo = geo.copy()
-        geo["_loc"] = (geo["latitude"].round(3).astype(str) + "_" +
-                       geo["longitude"].round(3).astype(str))
-        agg = (geo.groupby("_loc")
-               .agg(call_count=("_loc", "count"),
-                    lat=("latitude",  "mean"),
-                    lon=("longitude", "mean"))
-               .reset_index())
-
-    max_calls = agg["call_count"].max() or 1
-    agg["bubble_size"] = 4 + 28 * (agg["call_count"] / max_calls)
+    max_calls = geo["call_count"].max() or 1
+    geo = geo.copy()
+    geo["bubble_size"] = 4 + 28 * (geo["call_count"] / max_calls)
 
     fig.add_trace(go.Scattermapbox(
-        lat=agg["lat"],
-        lon=agg["lon"],
+        lat=geo["latitude"],
+        lon=geo["longitude"],
         mode="markers",
         name="Call Density",
         marker=dict(
-            size=agg["bubble_size"],
-            color=agg["call_count"],
-            colorscale="Viridis",
-            cmin=agg["call_count"].min(),
-            cmax=agg["call_count"].max(),
-            colorbar=dict(title="Calls", x=0.01, xanchor="left",
+            size=geo["bubble_size"],
+            color=geo["call_count"],
+            colorscale="YlOrRd",
+            cmin=geo["call_count"].min(),
+            cmax=geo["call_count"].max(),
+            colorbar=dict(title="Calls", x=0.99, xanchor="right",
                           bgcolor="rgba(26,26,46,0.8)",
                           tickfont=dict(color="#e0e0e0")),
             opacity=0.75,
@@ -266,10 +311,8 @@ def _build_density_map(df: pd.DataFrame) -> go.Figure:
         ),
     ))
 
-    # ── Layer 2: DBSCAN hotspot cluster centres ──
     labels = _dbscan_clusters(geo)
-    geo = geo.copy()
-    geo["cluster"] = labels.values
+    geo = geo.assign(cluster=labels.values if not labels.empty else -1)
 
     cluster_ids = sorted(geo[geo["cluster"] >= 0]["cluster"].unique())
     for cid in cluster_ids:
@@ -278,7 +321,6 @@ def _build_density_map(df: pd.DataFrame) -> go.Figure:
         centre_lat = sub["latitude"].mean()
         centre_lon = sub["longitude"].mean()
 
-        # Convex-hull scatter ring to mark cluster area
         fig.add_trace(go.Scattermapbox(
             lat=sub["latitude"],
             lon=sub["longitude"],
@@ -293,7 +335,6 @@ def _build_density_map(df: pd.DataFrame) -> go.Figure:
             ),
             showlegend=True,
         ))
-        # Centroid star marker
         fig.add_trace(go.Scattermapbox(
             lat=[centre_lat],
             lon=[centre_lon],
@@ -337,64 +378,29 @@ def _build_density_map(df: pd.DataFrame) -> go.Figure:
     return fig
 
 
-# ── Map: density heatmap variant ─────────────────────────────────
-def _build_heatmap(df: pd.DataFrame) -> go.Figure:
-    """Density heatmap of all calls."""
-    geo = _geo_df(df)
-    fig = go.Figure()
-
-    if geo.empty:
-        fig.update_layout(template="plotly_dark",
-                          paper_bgcolor="rgba(0,0,0,0)",
-                          height=300,
-                          annotations=[dict(text="No geo data",
-                                           showarrow=False)])
-        return fig
-
-    fig.add_trace(go.Densitymapbox(
-        lat=geo["latitude"],
-        lon=geo["longitude"],
-        colorscale="Hot",
-        radius=14,
-        opacity=0.75,
-        hovertemplate="<b>Density:</b> %{z:.2f}<extra></extra>",
-        name="Call Density",
-    ))
-
-    clat, clon = _map_centre(geo)
-    fig.update_layout(
-        template="plotly_dark",
-        paper_bgcolor="rgba(0,0,0,0)",
-        mapbox=dict(style="open-street-map",
-                    center=dict(lat=clat, lon=clon), zoom=10),
-        height=300,
-        margin=dict(l=0, r=0, t=35, b=0),
-        title=dict(text="Call Density Heatmap",
-                   x=0.5, font=dict(size=14, color="#e0e0e0")),
-    )
-    return fig
-
-
 # ── Service-type breakdown by city ───────────────────────────────
-def _build_city_bar(df: pd.DataFrame) -> go.Figure:
-    """Stacked bar: EMS vs Fire call count per city (top 12)."""
-    if df.empty or "city_name" not in df.columns:
-        return go.Figure()
+def _build_city_bar(filters: dict) -> go.Figure:
+    df = _filtered_city(filters)
+    if df.empty:
+        return _empty_fig()
 
-    top_cities = (df["city_name"].value_counts()
-                  .head(12).index.tolist())
+    by_city = (df.groupby("city_name")["call_count"].sum()
+               .sort_values(ascending=False)
+               .head(12))
+    top_cities = by_city.index.tolist()
     sub = df[df["city_name"].isin(top_cities)]
 
-    agg = (sub.groupby(["city_name", "service_type"])
-           .size()
+    agg = (sub.groupby(["city_name", "service"])["call_count"]
+           .sum()
            .reset_index(name="count"))
 
     fig = px.bar(
-        agg, x="city_name", y="count", color="service_type",
+        agg, x="city_name", y="count", color="service",
         color_discrete_map={"EMS": COLORS["ems"], "Fire": COLORS["fire"]},
         labels={"city_name": "City", "count": "Calls",
-                "service_type": "Service"},
+                "service": "Service"},
         barmode="stack",
+        category_orders={"city_name": top_cities},
     )
     fig.update_layout(
         template="plotly_dark",
@@ -410,27 +416,27 @@ def _build_city_bar(df: pd.DataFrame) -> go.Figure:
 
 
 # ── Response Equity scatter ───────────────────────────────────────
-def _build_equity_scatter(df: pd.DataFrame) -> go.Figure:
-    """
-    Scatter: x = call volume per city (proxy for demand / burden),
-             y = avg completeness_score (proxy for response data quality / compliance).
-    Colour = service_type split.
-    """
-    if df.empty or "city_name" not in df.columns:
-        return go.Figure()
+def _build_equity_scatter(filters: dict) -> go.Figure:
+    df = _filtered_city(filters)
+    if df.empty:
+        return _empty_fig()
 
-    # Build city-level summary
-    agg = (df.groupby(["city_name", "service_type"])
-           .agg(call_count=("city_name", "count"),
-                avg_completeness=("completeness_score", "mean"))
+    agg = (df.groupby(["city_name", "service"])
+           .agg(call_count=("call_count", "sum"),
+                comp_sum=("completeness_sum", "sum"),
+                comp_n=("completeness_count", "sum"))
            .reset_index())
+    agg = agg[agg["comp_n"] > 0].copy()
+    if agg.empty:
+        return _empty_fig()
+    agg["avg_completeness"] = agg["comp_sum"] / agg["comp_n"]
     agg["avg_completeness_pct"] = (agg["avg_completeness"] * 100).round(2)
 
     fig = px.scatter(
         agg,
         x="call_count",
         y="avg_completeness_pct",
-        color="service_type",
+        color="service",
         size="call_count",
         size_max=40,
         text="city_name",
@@ -438,12 +444,11 @@ def _build_equity_scatter(df: pd.DataFrame) -> go.Figure:
         labels={
             "call_count":           "Call Volume",
             "avg_completeness_pct": "Avg Data Completeness (%)",
-            "service_type":         "Service",
+            "service":              "Service",
             "city_name":            "City",
         },
     )
 
-    # NFPA 90% compliance reference line
     fig.add_hline(y=90, line_dash="dash", line_color=COLORS["danger"],
                   annotation_text="90% NFPA Target",
                   annotation_position="bottom right")
@@ -464,30 +469,35 @@ def _build_equity_scatter(df: pd.DataFrame) -> go.Figure:
     return fig
 
 
-def _build_equity_bar(df: pd.DataFrame) -> go.Figure:
-    """Horizontal bar: avg completeness per city, colour-coded vs 90% target."""
-    if df.empty or "city_name" not in df.columns:
-        return go.Figure()
+def _build_equity_bar(filters: dict) -> go.Figure:
+    df = _filtered_city(filters)
+    if df.empty:
+        return _empty_fig()
 
-    city_comp = (df.groupby("city_name")["completeness_score"]
-                 .mean()
-                 .reset_index())
-    city_comp.columns = ["City", "Score"]
-    city_comp["Score_pct"] = (city_comp["Score"] * 100).round(2)
-    city_comp = (city_comp
-                 .sort_values("Score_pct", ascending=True)
-                 .tail(15))
+    per_city = (df.groupby("city_name")
+                .agg(comp_sum=("completeness_sum", "sum"),
+                     comp_n=("completeness_count", "sum"))
+                .reset_index())
+    per_city = per_city[per_city["comp_n"] > 0].copy()
+    if per_city.empty:
+        return _empty_fig()
+    per_city["Score"] = per_city["comp_sum"] / per_city["comp_n"]
+    per_city["Score_pct"] = (per_city["Score"] * 100).round(2)
+    per_city = per_city.rename(columns={"city_name": "City"})
+    per_city = (per_city[["City", "Score_pct"]]
+                .sort_values("Score_pct", ascending=True)
+                .tail(15))
 
     bar_colors = [COLORS["success"] if s >= 90
                   else (COLORS["warning"] if s >= 70 else COLORS["danger"])
-                  for s in city_comp["Score_pct"]]
+                  for s in per_city["Score_pct"]]
 
     fig = go.Figure(go.Bar(
-        x=city_comp["Score_pct"],
-        y=city_comp["City"],
+        x=per_city["Score_pct"],
+        y=per_city["City"],
         orientation="h",
         marker_color=bar_colors,
-        text=[f"{s:.1f}%" for s in city_comp["Score_pct"]],
+        text=[f"{s:.1f}%" for s in per_city["Score_pct"]],
         textposition="auto",
         textfont=dict(color="white", size=11),
     ))
@@ -507,26 +517,17 @@ def _build_equity_bar(df: pd.DataFrame) -> go.Figure:
     return fig
 
 
-def _build_call_type_geo(df: pd.DataFrame) -> go.Figure:
-    """Bar: top incident categories with geographic spread (# unique CBGs)."""
-    if df.empty or "call_type" not in df.columns:
-        return go.Figure()
+def _build_call_type_geo(filters: dict) -> go.Figure:
+    df = _filtered_call_type(filters)
+    if df.empty:
+        return _empty_fig()
 
-    cbg_col = "census_block_group" if "census_block_group" in df.columns else None
-    if cbg_col:
-        spread = (df.groupby("call_type")
-                  .agg(total=("call_type", "count"),
-                       cbg_spread=(cbg_col, "nunique"))
-                  .reset_index()
-                  .sort_values("total", ascending=False)
-                  .head(12))
-    else:
-        spread = (df["call_type"].value_counts()
-                  .head(12)
-                  .reset_index())
-        spread.columns = ["call_type", "total"]
-        spread["cbg_spread"] = 0
-
+    spread = (df.groupby("call_type")
+              .agg(total=("total_calls", "sum"),
+                   cbg_spread=("unique_cbg_count", "max"))
+              .reset_index()
+              .sort_values("total", ascending=False)
+              .head(12))
     spread = spread.sort_values("cbg_spread", ascending=True)
 
     fig = go.Figure(go.Bar(
@@ -583,15 +584,12 @@ layout = dbc.Container([
            "and response-equity analysis across Pittsburgh.",
            className="text-muted mb-4"),
 
-    # ── KPI Row (via callback) ──
     html.Div(id="geo-kpi-row"),
 
     html.Hr(style={"borderColor": "#333"}),
 
-    # ── Tabs: Map View / Response Equity ──
     dbc.Tabs(id="geo-tabs", active_tab="tab-map", children=[
 
-        # ── Tab 1: Map ──
         dbc.Tab(label="📍 Hotspot Map", tab_id="tab-map", children=[
             dbc.Row([
                 dbc.Col([
@@ -600,7 +598,6 @@ layout = dbc.Container([
                                   config={"scrollZoom": True}),
                         className="mt-3",
                     ),
-                    # Legend / info banner
                     dbc.Alert([
                         html.Strong("Legend: "),
                         "Bubble size & colour = call count per block-group centroid. ",
@@ -612,12 +609,10 @@ layout = dbc.Container([
             ]),
             html.Hr(style={"borderColor": "#333"}),
             dbc.Row([
-                dbc.Col(dcc.Graph(id="geo-heatmap"), md=6),
-                dbc.Col(dcc.Graph(id="geo-city-bar"), md=6),
+                dbc.Col(dcc.Graph(id="geo-city-bar"), md=12),
             ], className="mt-3 mb-4"),
         ]),
 
-        # ── Tab 2: Response Equity ──
         dbc.Tab(label="⚖️ Response Equity", tab_id="tab-equity", children=[
             dbc.Row([
                 dbc.Col(dcc.Graph(id="geo-equity-scatter"), md=12),
@@ -642,36 +637,34 @@ layout = dbc.Container([
 
 
 # ═══════════════════════════════════════════════════════════════
-# Callbacks — react to global filter store
+# Callbacks — one per output, wired to the global filter store
 # ═══════════════════════════════════════════════════════════════
 
-@callback(
-    Output("geo-kpi-row",        "children"),
-    Output("geo-density-map",    "figure"),
-    Output("geo-heatmap",        "figure"),
-    Output("geo-city-bar",       "figure"),
-    Output("geo-equity-scatter", "figure"),
-    Output("geo-equity-bar",     "figure"),
-    Output("geo-call-type-geo",  "figure"),
-    Input("global-filter-store", "data"),
-)
-def update_geography(filters):
-    """Re-render all geography charts when global filters change."""
-    df = _apply_filters(DF, filters)
+@callback(Output("geo-kpi-row", "children"), Input("global-filter-store", "data"))
+def _cb_kpi_row(filters):
+    return _build_kpi_row(filters or {})
 
-    if df.empty:
-        emp = _empty_fig()
-        return (
-            dbc.Alert("No data matches the current filters.", color="warning"),
-            emp, emp, emp, emp, emp, emp,
-        )
 
-    return (
-        _build_kpi_row(df),
-        _build_density_map(df),
-        _build_heatmap(df),
-        _build_city_bar(df),
-        _build_equity_scatter(df),
-        _build_equity_bar(df),
-        _build_call_type_geo(df),
-    )
+@callback(Output("geo-density-map", "figure"), Input("global-filter-store", "data"))
+def _cb_density_map(filters):
+    return _build_density_map(filters or {})
+
+
+@callback(Output("geo-city-bar", "figure"), Input("global-filter-store", "data"))
+def _cb_city_bar(filters):
+    return _build_city_bar(filters or {})
+
+
+@callback(Output("geo-equity-scatter", "figure"), Input("global-filter-store", "data"))
+def _cb_equity_scatter(filters):
+    return _build_equity_scatter(filters or {})
+
+
+@callback(Output("geo-equity-bar", "figure"), Input("global-filter-store", "data"))
+def _cb_equity_bar(filters):
+    return _build_equity_bar(filters or {})
+
+
+@callback(Output("geo-call-type-geo", "figure"), Input("global-filter-store", "data"))
+def _cb_call_type_geo(filters):
+    return _build_call_type_geo(filters or {})

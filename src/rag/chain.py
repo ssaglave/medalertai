@@ -1,12 +1,12 @@
 """
 src/rag/chain.py
 
-Phase 3 - LangChain RetrievalQA chain with Ollama.
+Phase 3 - LangChain RetrievalQA chain with Hugging Face inference.
 Owner: Srileakhana (C4)
 
 Responsibilities covered here:
   - Build a protocol-only RetrievalQA chain over the ChromaDB retriever.
-  - Use a local Ollama chat model by default when the Ollama server is running.
+  - Use a Hugging Face inference endpoint by default when a token is configured.
   - Return citation-ready source metadata for dashboard callbacks and tests.
 
 Usage from the repo root after running ingestion/vectorstore setup:
@@ -20,13 +20,13 @@ import os
 from dataclasses import dataclass
 from typing import Any, Iterable
 
-from config.settings import OLLAMA_BASE_URL, OLLAMA_MODEL
+from config.settings import HUGGINGFACE_API_TOKEN, HUGGINGFACE_ENDPOINT_URL, HUGGINGFACE_MODEL
 
 
 log = logging.getLogger("medalertai.rag.chain")
 
-DEFAULT_MODEL = os.getenv("OLLAMA_MODEL", OLLAMA_MODEL)
-DEFAULT_OLLAMA_BASE_URL = os.getenv("OLLAMA_BASE_URL", OLLAMA_BASE_URL)
+DEFAULT_MODEL = os.getenv("HUGGINGFACE_MODEL", HUGGINGFACE_MODEL)
+DEFAULT_HF_ENDPOINT_URL = os.getenv("HUGGINGFACE_ENDPOINT_URL", HUGGINGFACE_ENDPOINT_URL)
 DEFAULT_TOP_K = int(os.getenv("RAG_TOP_K", "5"))
 FALLBACK_ANSWER = (
     "I do not have enough protocol context in the retrieved sources to answer "
@@ -56,6 +56,63 @@ Answer:"""
 
 class RagChainError(RuntimeError):
     """Raised when the RAG chain cannot be created or queried."""
+
+
+try:
+    from langchain_core.language_models.llms import LLM
+except ImportError as exc:
+    raise RuntimeError("LangChain core is required for the RAG chain.") from exc
+
+
+class HuggingFaceInferenceLLM(LLM):
+    """Small adapter that exposes Hugging Face text generation to LangChain RetrievalQA."""
+
+    def __init__(
+        self,
+        model: str,
+        api_token: str,
+        endpoint_url: str = "",
+        temperature: float = 0.0,
+        max_new_tokens: int = 512,
+    ) -> None:
+        try:
+            from huggingface_hub import InferenceClient
+        except ImportError as exc:
+            raise RagChainError(
+                "huggingface-hub is required for Hugging Face inference."
+            ) from exc
+
+        client_kwargs = {"token": api_token, "timeout": 60}
+        if endpoint_url:
+            client_kwargs["base_url"] = endpoint_url
+        else:
+            client_kwargs["model"] = model
+
+        super().__init__()
+        self._client = InferenceClient(**client_kwargs)
+        self._model = model
+        self._temperature = temperature
+        self._max_new_tokens = max_new_tokens
+
+    @property
+    def _llm_type(self) -> str:
+        return "huggingface_inference"
+
+    def invoke(self, prompt: str, **kwargs: Any) -> str:
+        stop = kwargs.get("stop")
+        return self._call(prompt, stop=stop)
+
+    def _call(self, prompt: str, stop: list[str] | None = None, **_: Any) -> str:
+        response = self._client.chat_completion(
+            messages=[{"role": "user", "content": prompt}],
+            max_tokens=self._max_new_tokens,
+            temperature=self._temperature,
+            stop=stop,
+        )
+        try:
+            return response.choices[0].message.content.strip()
+        except (AttributeError, IndexError, KeyError, TypeError):
+            return str(response).strip()
 
 
 @dataclass(frozen=True)
@@ -103,23 +160,16 @@ def build_prompt():
 
 
 def get_llm(model: str = DEFAULT_MODEL, temperature: float = 0.0):
-    """Return the Ollama chat model used by the RAG chain."""
-    try:
-        from langchain_ollama import ChatOllama
-    except ImportError:
-        try:
-            from langchain_community.chat_models import ChatOllama
-        except ImportError as exc:
-            raise RagChainError(
-                "An Ollama chat integration is required for RetrievalQA. "
-                "Install requirements.txt before running the RAG assistant."
-            ) from exc
-
-    return ChatOllama(
+    """Return the Hugging Face inference model used by the RAG chain."""
+    api_token = HUGGINGFACE_API_TOKEN or os.getenv("HUGGINGFACE_API_TOKEN", "")
+    if not api_token:
+        raise RagChainError("HUGGINGFACE_API_TOKEN is required to query the Hugging Face endpoint.")
+    return HuggingFaceInferenceLLM(
         model=model,
-        base_url=DEFAULT_OLLAMA_BASE_URL,
+        api_token=api_token,
+        endpoint_url=DEFAULT_HF_ENDPOINT_URL,
         temperature=temperature,
-        num_predict=512,
+        max_new_tokens=512,
     )
 
 

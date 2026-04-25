@@ -249,7 +249,7 @@ def update_chat(
             f"Dashboard detail: `{exc}`"
         )
         sources = []
-        status = "RAG assistant is not ready yet. Check that Ollama is running, the model is pulled, and the vector store/ingestion outputs exist."
+        status = "RAG assistant is not ready yet. Check the Hugging Face token/endpoint settings and the vector store/ingestion outputs."
         status_color = "warning"
     except Exception as exc:
         answer = (

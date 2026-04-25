@@ -26,8 +26,9 @@ MODEL_ARTIFACTS_DIR = PROJECT_ROOT / os.getenv("MODEL_ARTIFACTS_DIR", "models/ar
 CHROMA_PERSIST_DIR = PROJECT_ROOT / os.getenv("CHROMA_PERSIST_DIR", "chroma_db")
 
 # ── API Keys ──
-OLLAMA_BASE_URL = os.getenv("OLLAMA_BASE_URL", "http://localhost:11434")
-OLLAMA_MODEL = os.getenv("OLLAMA_MODEL", "llama3.2")
+HUGGINGFACE_API_TOKEN = os.getenv("HUGGINGFACE_API_TOKEN", "")
+HUGGINGFACE_ENDPOINT_URL = os.getenv("HUGGINGFACE_ENDPOINT_URL", "")
+HUGGINGFACE_MODEL = os.getenv("HUGGINGFACE_MODEL", "mistralai/Mistral-7B-Instruct-v0.3")
 
 # ── Model Defaults ──
 CLASSIFIER_TARGET = "mpds_group"

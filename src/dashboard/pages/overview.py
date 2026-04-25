@@ -5,18 +5,20 @@ Lead: Suvarna (C2) — Phase 4A collaborative page
 Phase: 4
 
 Charts:
-  1. KPI tile row (dbc.Card)  — Total calls, EMS count, Fire count, avg/quarter
-  2. EMS vs Fire donut        (px.pie)
-  3. Top-8 incident bar       (px.bar)
-  4. Stacked area by year     (px.area)
-  5. Sankey chart              (go.Sankey) — Service → Priority → Call Type
+  1. KPI tile row              — Total calls, EMS count, Fire count, avg/quarter
+  2. EMS vs Fire donut         (px.pie)
+  3. Top-8 incident bar        (px.bar)
+  4. Stacked area by year      (px.area)
+  5. Sankey                    (go.Sankey) — Service → Priority → Call Type
   6. Priority Distribution Funnel (px.funnel)
   7. Service Pipeline Bar      (px.bar horizontal)
 
-Data source: data/processed/fact_dispatch_clean.parquet
+Data source (built by scripts/build_overview_aggregates.py):
+    data/processed/overview_agg.parquet
+        per (year, quarter, service, priority_level, call_type):
+            call_count, with_coords_count, high_completeness_count
 """
 
-import sys
 from pathlib import Path
 
 import dash
@@ -25,26 +27,33 @@ import dash_bootstrap_components as dbc
 import plotly.express as px
 import plotly.graph_objects as go
 import pandas as pd
-import numpy as np
 
-# ── Page Registration ──
 dash.register_page(__name__, path="/", name="Overview", order=0)
 
-# ── Data Loading ──
 _REPO_ROOT = Path(__file__).resolve().parent.parent.parent.parent
-_PARQUET = _REPO_ROOT / "data" / "processed" / "fact_dispatch_clean.parquet"
+_AGG_PATH = _REPO_ROOT / "data" / "processed" / "overview_agg.parquet"
 
-try:
-    DF = pd.read_parquet(_PARQUET)
-except FileNotFoundError:
-    DF = pd.DataFrame()
+_AGG_CACHE: pd.DataFrame | None = None
 
-# ── Color Palette ──
+
+def _load_agg() -> pd.DataFrame:
+    global _AGG_CACHE
+    if _AGG_CACHE is None:
+        if _AGG_PATH.exists():
+            _AGG_CACHE = pd.read_parquet(_AGG_PATH)
+        else:
+            _AGG_CACHE = pd.DataFrame(
+                columns=["year", "quarter", "service", "priority_level", "call_type",
+                         "call_count", "with_coords_count", "high_completeness_count"]
+            )
+    return _AGG_CACHE
+
+
 COLORS = {
-    "ems":        "#00d4ff",   # cyan
-    "fire":       "#ff6b35",   # orange
-    "accent":     "#a855f7",   # purple
-    "bg_card":    "#1a1a2e",   # dark card
+    "ems":        "#00d4ff",
+    "fire":       "#ff6b35",
+    "accent":     "#a855f7",
+    "bg_card":    "#1a1a2e",
     "bg_card2":   "#16213e",
     "text":       "#e0e0e0",
     "success":    "#10b981",
@@ -59,57 +68,29 @@ PRIORITY_COLOR_MAP = {
     "Other":             "#6b7280",
 }
 
+PRIORITY_ORDER = ["Life Threatening", "ALS", "BLS", "Non-Emergency", "Other"]
 
-# ═══════════════════════════════════════════════════════════════
-# Helper: apply global filters to DataFrame
-# ═══════════════════════════════════════════════════════════════
-def _apply_filters(df: pd.DataFrame, filters: dict) -> pd.DataFrame:
-    """Filter dataframe based on global-filter-store data."""
-    if not filters or df.empty:
+
+def _filter(filters: dict) -> pd.DataFrame:
+    df = _load_agg()
+    if df.empty:
         return df
-
-    years = filters.get("years", [])
-    services = filters.get("services", [])
-    call_types = filters.get("call_types", [])
+    filters = filters or {}
+    years = filters.get("years") or []
+    services = filters.get("services") or []
+    call_types = filters.get("call_types") or []
 
     mask = pd.Series(True, index=df.index)
-
     if years:
-        mask &= df["CALL_YEAR"].isin(years)
+        mask &= df["year"].isin(years)
     if services:
-        mask &= df["service_type"].isin(services)
+        mask &= df["service"].isin(services)
     if call_types:
         mask &= df["call_type"].isin(call_types)
-
     return df[mask]
 
 
-# ═══════════════════════════════════════════════════════════════
-# Helper: map priority_description to broad triage level
-# ═══════════════════════════════════════════════════════════════
-def _map_priority_level(desc: str) -> str:
-    """Map verbose priority descriptions to broad triage levels."""
-    if pd.isna(desc):
-        return "Other"
-    desc_lower = desc.lower()
-    if "life threatening" in desc_lower:
-        return "Life Threatening"
-    elif "advanced life support" in desc_lower or "als" in desc_lower:
-        return "ALS"
-    elif "basic life support" in desc_lower or "bls" in desc_lower:
-        return "BLS"
-    elif any(k in desc_lower for k in ["assist", "admin", "non emergency",
-                                        "no immediate threat", "mark out"]):
-        return "Non-Emergency"
-    else:
-        return "Other"
-
-
-# ═══════════════════════════════════════════════════════════════
-# KPI Card builder
-# ═══════════════════════════════════════════════════════════════
 def _kpi_card(title: str, value, icon: str, color: str) -> dbc.Col:
-    """Create a single KPI card."""
     return dbc.Col(
         dbc.Card([
             dbc.CardBody([
@@ -132,16 +113,26 @@ def _kpi_card(title: str, value, icon: str, color: str) -> dbc.Col:
     )
 
 
-# ═══════════════════════════════════════════════════════════════
-# Chart builders  (pure functions — no side effects)
-# ═══════════════════════════════════════════════════════════════
+def _empty_fig() -> go.Figure:
+    fig = go.Figure()
+    fig.update_layout(
+        template="plotly_dark",
+        paper_bgcolor="rgba(0,0,0,0)",
+        annotations=[dict(text="No data matches filters",
+                          showarrow=False, font=dict(size=18))]
+    )
+    return fig
 
-def _build_kpi_row(df: pd.DataFrame) -> dbc.Row:
-    """KPI tile row: Total, EMS, Fire, Avg per Quarter."""
-    total = len(df)
-    ems = (df["service_type"] == "EMS").sum()
-    fire = (df["service_type"] == "Fire").sum()
-    n_quarters = df.groupby(["CALL_YEAR", "CALL_QUARTER"]).ngroups
+
+def _build_kpi_row(filters: dict):
+    df = _filter(filters)
+    if df.empty:
+        return dbc.Alert("No data matches the current filters.", color="warning")
+
+    total = int(df["call_count"].sum())
+    ems = int(df.loc[df["service"] == "EMS", "call_count"].sum())
+    fire = int(df.loc[df["service"] == "Fire", "call_count"].sum())
+    n_quarters = df.groupby(["year", "quarter"]).ngroups
     avg_q = total / max(n_quarters, 1)
 
     return dbc.Row([
@@ -152,9 +143,12 @@ def _build_kpi_row(df: pd.DataFrame) -> dbc.Row:
     ])
 
 
-def _build_donut(df: pd.DataFrame) -> go.Figure:
-    """EMS vs Fire donut chart."""
-    counts = df["service_type"].value_counts().reset_index()
+def _build_donut(filters: dict) -> go.Figure:
+    df = _filter(filters)
+    if df.empty:
+        return _empty_fig()
+    counts = (df.groupby("service", observed=True)["call_count"].sum()
+              .reset_index())
     counts.columns = ["Service", "Count"]
 
     fig = px.pie(
@@ -169,19 +163,18 @@ def _build_donut(df: pd.DataFrame) -> go.Figure:
         plot_bgcolor="rgba(0,0,0,0)",
         margin=dict(t=30, b=10, l=10, r=10),
         legend=dict(orientation="h", y=-0.05),
-        title=dict(text="EMS vs Fire Distribution", x=0.5,
-                   font=dict(size=16)),
+        title=dict(text="EMS vs Fire Distribution", x=0.5, font=dict(size=16)),
     )
     return fig
 
 
-def _build_top8_bar(df: pd.DataFrame) -> go.Figure:
-    """Top-8 incident category horizontal bar chart."""
-    top = (df["call_type"]
-           .value_counts()
-           .head(8)
-           .sort_values(ascending=True)
-           .reset_index())
+def _build_top8_bar(filters: dict) -> go.Figure:
+    df = _filter(filters)
+    if df.empty:
+        return _empty_fig()
+
+    top = (df.groupby("call_type", observed=True)["call_count"].sum()
+             .nlargest(8).sort_values(ascending=True).reset_index())
     top.columns = ["Category", "Count"]
 
     fig = px.bar(
@@ -195,19 +188,22 @@ def _build_top8_bar(df: pd.DataFrame) -> go.Figure:
         plot_bgcolor="rgba(0,0,0,0)",
         margin=dict(t=30, b=10, l=10, r=10),
         coloraxis_showscale=False,
-        title=dict(text="Top 8 Incident Categories", x=0.5,
-                   font=dict(size=16)),
+        title=dict(text="Top 8 Incident Categories", x=0.5, font=dict(size=16)),
         yaxis_title="",
         xaxis_title="Number of Calls",
     )
     return fig
 
 
-def _build_stacked_area(df: pd.DataFrame) -> go.Figure:
-    """Stacked area chart by year and service type."""
-    yearly = (df.groupby(["CALL_YEAR", "service_type"])
-              .size()
+def _build_stacked_area(filters: dict) -> go.Figure:
+    df = _filter(filters)
+    if df.empty:
+        return _empty_fig()
+
+    yearly = (df.groupby(["year", "service"], observed=True)["call_count"]
+              .sum()
               .reset_index(name="Count"))
+    yearly = yearly.rename(columns={"year": "CALL_YEAR", "service": "service_type"})
 
     fig = px.area(
         yearly, x="CALL_YEAR", y="Count", color="service_type",
@@ -221,56 +217,50 @@ def _build_stacked_area(df: pd.DataFrame) -> go.Figure:
         plot_bgcolor="rgba(0,0,0,0)",
         margin=dict(t=30, b=10, l=10, r=10),
         legend=dict(orientation="h", y=-0.15),
-        title=dict(text="Call Volume Over Time", x=0.5,
-                   font=dict(size=16)),
+        title=dict(text="Call Volume Over Time", x=0.5, font=dict(size=16)),
         xaxis=dict(dtick=1),
     )
     return fig
 
 
-def _build_sankey(df: pd.DataFrame) -> go.Figure:
-    """Sankey: Service Type → Priority Level → Top Call Types."""
-    # Map priorities to broad levels
-    df = df.copy()
-    df["priority_level"] = df["priority_description"].apply(_map_priority_level)
+def _build_sankey(filters: dict) -> go.Figure:
+    df = _filter(filters)
+    if df.empty:
+        return _empty_fig()
 
-    # Limit to top-8 call types for readability
-    top_types = df["call_type"].value_counts().head(8).index.tolist()
-    df_sankey = df[df["call_type"].isin(top_types)].copy()
+    top_types = (df.groupby("call_type", observed=True)["call_count"].sum()
+                   .nlargest(8).index.tolist())
+    df = df[df["call_type"].isin(top_types)]
+    if df.empty:
+        return _empty_fig()
 
-    # --- Build node/link lists ---
-    services = df_sankey["service_type"].unique().tolist()
-    priorities = df_sankey["priority_level"].unique().tolist()
+    services = sorted(df["service"].unique().tolist())
+    priorities = [p for p in PRIORITY_ORDER if p in df["priority_level"].unique()]
     call_types = top_types
 
     all_labels = services + priorities + call_types
     label_idx = {lbl: i for i, lbl in enumerate(all_labels)}
 
-    # Service → Priority links
-    sp = (df_sankey.groupby(["service_type", "priority_level"])
-          .size().reset_index(name="count"))
-    # Priority → Call Type links
-    pc = (df_sankey.groupby(["priority_level", "call_type"])
-          .size().reset_index(name="count"))
+    sp = (df.groupby(["service", "priority_level"], observed=True)["call_count"]
+            .sum().reset_index(name="count"))
+    pc = (df.groupby(["priority_level", "call_type"], observed=True)["call_count"]
+            .sum().reset_index(name="count"))
 
     sources, targets, values = [], [], []
-
     for _, row in sp.iterrows():
-        sources.append(label_idx[row["service_type"]])
+        sources.append(label_idx[row["service"]])
         targets.append(label_idx[row["priority_level"]])
-        values.append(row["count"])
-
+        values.append(int(row["count"]))
     for _, row in pc.iterrows():
         sources.append(label_idx[row["priority_level"]])
         targets.append(label_idx[row["call_type"]])
-        values.append(row["count"])
+        values.append(int(row["count"]))
 
-    # Node colors
     node_colors = []
     for lbl in all_labels:
-        if lbl in ("EMS",):
+        if lbl == "EMS":
             node_colors.append(COLORS["ems"])
-        elif lbl in ("Fire",):
+        elif lbl == "Fire":
             node_colors.append(COLORS["fire"])
         elif lbl in PRIORITY_COLOR_MAP:
             node_colors.append(PRIORITY_COLOR_MAP[lbl])
@@ -278,8 +268,7 @@ def _build_sankey(df: pd.DataFrame) -> go.Figure:
             node_colors.append(COLORS["accent"])
 
     fig = go.Figure(go.Sankey(
-        node=dict(pad=20, thickness=20,
-                  label=all_labels, color=node_colors),
+        node=dict(pad=20, thickness=20, label=all_labels, color=node_colors),
         link=dict(source=sources, target=targets, value=values,
                   color="rgba(168, 85, 247, 0.25)"),
     ))
@@ -293,21 +282,18 @@ def _build_sankey(df: pd.DataFrame) -> go.Figure:
     return fig
 
 
-def _build_priority_funnel(df: pd.DataFrame) -> go.Figure:
-    """Priority Distribution Funnel chart."""
-    df = df.copy()
-    df["priority_level"] = df["priority_description"].apply(_map_priority_level)
+def _build_priority_funnel(filters: dict) -> go.Figure:
+    df = _filter(filters)
+    if df.empty:
+        return _empty_fig()
 
-    # Order levels from most to least severe
-    level_order = ["Life Threatening", "ALS", "BLS", "Non-Emergency", "Other"]
-    counts = df["priority_level"].value_counts()
-
-    funnel_data = []
-    for level in level_order:
-        if level in counts.index:
-            funnel_data.append({"Level": level, "Count": counts[level]})
-
-    funnel_df = pd.DataFrame(funnel_data)
+    counts = df.groupby("priority_level", observed=True)["call_count"].sum()
+    funnel_df = pd.DataFrame(
+        [{"Level": lvl, "Count": int(counts[lvl])}
+         for lvl in PRIORITY_ORDER if lvl in counts.index]
+    )
+    if funnel_df.empty:
+        return _empty_fig()
 
     fig = px.funnel(
         funnel_df, x="Count", y="Level",
@@ -320,17 +306,19 @@ def _build_priority_funnel(df: pd.DataFrame) -> go.Figure:
         plot_bgcolor="rgba(0,0,0,0)",
         margin=dict(t=40, b=10, l=10, r=10),
         showlegend=False,
-        title=dict(text="Priority Distribution Funnel", x=0.5,
-                   font=dict(size=16)),
+        title=dict(text="Priority Distribution Funnel", x=0.5, font=dict(size=16)),
     )
     return fig
 
 
-def _build_pipeline_bar(df: pd.DataFrame) -> go.Figure:
-    """Service Pipeline Bar: Total → With Coords → Complete Data."""
-    total = len(df)
-    with_coords = df["longitude"].notna().sum()
-    high_completeness = (df["completeness_score"] >= 0.75).sum()
+def _build_pipeline_bar(filters: dict) -> go.Figure:
+    df = _filter(filters)
+    if df.empty:
+        return _empty_fig()
+
+    total = int(df["call_count"].sum())
+    with_coords = int(df["with_coords_count"].sum())
+    high_completeness = int(df["high_completeness_count"].sum())
 
     stages = ["Total Calls", "With Coordinates", "High Completeness (≥75%)"]
     values = [total, with_coords, high_completeness]
@@ -350,8 +338,7 @@ def _build_pipeline_bar(df: pd.DataFrame) -> go.Figure:
         paper_bgcolor="rgba(0,0,0,0)",
         plot_bgcolor="rgba(0,0,0,0)",
         margin=dict(t=40, b=10, l=10, r=10),
-        title=dict(text="Data Quality Pipeline", x=0.5,
-                   font=dict(size=16)),
+        title=dict(text="Data Quality Pipeline", x=0.5, font=dict(size=16)),
         xaxis_title="Number of Records",
         yaxis_title="",
         yaxis=dict(autorange="reversed"),
@@ -364,82 +351,78 @@ def _build_pipeline_bar(df: pd.DataFrame) -> go.Figure:
 # ═══════════════════════════════════════════════════════════════
 
 layout = dbc.Container([
-    html.H2("📊 Overview", className="my-3",
-            style={"fontWeight": "700"}),
+    html.H2("📊 Overview", className="my-3", style={"fontWeight": "700"}),
     html.P("High-level dispatch analytics for Pittsburgh EMS & Fire services.",
            className="text-muted mb-4"),
 
-    # KPI Row (rendered via callback)
     html.Div(id="overview-kpi-row"),
 
     html.Hr(style={"borderColor": "#333"}),
 
-    # Row 1: Donut + Top-8 Bar
     dbc.Row([
         dbc.Col(dcc.Graph(id="overview-donut"), md=5),
         dbc.Col(dcc.Graph(id="overview-top8-bar"), md=7),
     ], className="mb-4"),
 
-    # Row 2: Stacked Area (full width)
     dbc.Row([
         dbc.Col(dcc.Graph(id="overview-stacked-area"), md=12),
     ], className="mb-4"),
 
     html.Hr(style={"borderColor": "#333"}),
 
-    # Row 3: Sankey (full width)
     dbc.Row([
         dbc.Col(dcc.Graph(id="overview-sankey",
                           style={"height": "500px"}), md=12),
     ], className="mb-4"),
 
-    # Row 4: Priority Funnel + Pipeline Bar
     dbc.Row([
         dbc.Col(dcc.Graph(id="overview-priority-funnel"), md=6),
         dbc.Col(dcc.Graph(id="overview-pipeline-bar"), md=6),
     ], className="mb-4"),
-
 ])
 
 
 # ═══════════════════════════════════════════════════════════════
-# Callbacks — all charts react to global filter store
+# Callbacks — one per output
 # ═══════════════════════════════════════════════════════════════
 
-@callback(
-    Output("overview-kpi-row", "children"),
-    Output("overview-donut", "figure"),
-    Output("overview-top8-bar", "figure"),
-    Output("overview-stacked-area", "figure"),
-    Output("overview-sankey", "figure"),
-    Output("overview-priority-funnel", "figure"),
-    Output("overview-pipeline-bar", "figure"),
-    Input("global-filter-store", "data"),
-)
-def update_overview(filters):
-    """Re-render all overview charts when global filters change."""
-    df = _apply_filters(DF, filters)
+@callback(Output("overview-kpi-row", "children"),
+          Input("global-filter-store", "data"))
+def _cb_kpi(filters):
+    return _build_kpi_row(filters or {})
 
-    if df.empty:
-        empty_fig = go.Figure()
-        empty_fig.update_layout(
-            template="plotly_dark",
-            paper_bgcolor="rgba(0,0,0,0)",
-            annotations=[dict(text="No data matches filters",
-                              showarrow=False, font=dict(size=18))]
-        )
-        return (
-            dbc.Alert("No data matches the current filters.", color="warning"),
-            empty_fig, empty_fig, empty_fig,
-            empty_fig, empty_fig, empty_fig,
-        )
 
-    return (
-        _build_kpi_row(df),
-        _build_donut(df),
-        _build_top8_bar(df),
-        _build_stacked_area(df),
-        _build_sankey(df),
-        _build_priority_funnel(df),
-        _build_pipeline_bar(df),
-    )
+@callback(Output("overview-donut", "figure"),
+          Input("global-filter-store", "data"))
+def _cb_donut(filters):
+    return _build_donut(filters or {})
+
+
+@callback(Output("overview-top8-bar", "figure"),
+          Input("global-filter-store", "data"))
+def _cb_top8(filters):
+    return _build_top8_bar(filters or {})
+
+
+@callback(Output("overview-stacked-area", "figure"),
+          Input("global-filter-store", "data"))
+def _cb_area(filters):
+    return _build_stacked_area(filters or {})
+
+
+@callback(Output("overview-sankey", "figure"),
+          Input("global-filter-store", "data"))
+def _cb_sankey(filters):
+    return _build_sankey(filters or {})
+
+
+@callback(Output("overview-priority-funnel", "figure"),
+          Input("global-filter-store", "data"))
+def _cb_funnel(filters):
+    return _build_priority_funnel(filters or {})
+
+
+@callback(Output("overview-pipeline-bar", "figure"),
+          Input("global-filter-store", "data"))
+def _cb_pipeline(filters):
+    return _build_pipeline_bar(filters or {})

@@ -145,6 +145,22 @@ def _create_message(text: str, sender: str, timestamp: str | None = None) -> dbc
     )
 
 
+def _displayable_sources(sources: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Dedupe by source and keep only those with an external URL — used by
+    both the accordion and the status counter so the panel and the message
+    stay consistent."""
+    seen: set[str] = set()
+    external: list[dict[str, Any]] = []
+    for source in sources or []:
+        key = (source.get("source_id") or source.get("title") or "").strip()
+        url = (source.get("url") or "").strip()
+        if not key or key in seen or not url:
+            continue
+        seen.add(key)
+        external.append(source)
+    return external
+
+
 def _create_sources_accordion(sources: list[dict[str, Any]]) -> dbc.Accordion | dbc.Alert:
     if not sources:
         return dbc.Alert(
@@ -152,23 +168,28 @@ def _create_sources_accordion(sources: list[dict[str, Any]]) -> dbc.Accordion | 
             color="warning",
         )
 
+    external = _displayable_sources(sources)
+
+    if not external:
+        return dbc.Alert(
+            "Answer derived from internal project reference documents (no external links available).",
+            color="info",
+        )
+
     items = []
-    for index, source in enumerate(sources, start=1):
+    for index, source in enumerate(external, start=1):
         title = source.get("title") or source.get("source_id") or f"Source {index}"
-        citation = source.get("citation") or title
-        snippet = source.get("snippet") or "No snippet available."
-        url = source.get("url")
-        file_name = source.get("file_name")
-
+        url = (source.get("url") or "").strip()
         body = [
-            html.P(citation, className="fw-bold mb-2"),
-            html.P(snippet, className="mb-2"),
+            html.A(
+                "Open external source ↗",
+                href=url,
+                target="_blank",
+                rel="noreferrer",
+                className="d-inline-block fw-bold mb-1",
+            ),
+            html.Div(url, className="text-muted small text-break"),
         ]
-        if file_name:
-            body.append(html.Small(f"File: {file_name}", className="d-block text-muted"))
-        if url:
-            body.append(html.A("Open source", href=url, target="_blank", rel="noreferrer"))
-
         items.append(
             dbc.AccordionItem(
                 body,
@@ -241,7 +262,11 @@ def update_chat(
         result = query(question)
         answer = result.get("answer") or FALLBACK_ANSWER
         sources = result.get("sources", [])
-        status = f"Answered with {len(sources)} retrieved source(s)."
+        displayed = _displayable_sources(sources)
+        if displayed:
+            status = f"Answered with {len(displayed)} retrieved source(s)."
+        else:
+            status = "Answered using internal project reference documents."
         status_color = "success"
     except (RagChainError, ValueError, ImportError, FileNotFoundError) as exc:
         answer = (

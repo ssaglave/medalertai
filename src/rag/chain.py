@@ -17,8 +17,13 @@ from __future__ import annotations
 
 import logging
 import os
+import re
 from dataclasses import dataclass
 from typing import Any, Iterable
+
+# Strips any leftover "[source: ...; chunk: N]" markers the LLM may emit
+# despite the prompt instruction not to.
+_CITATION_MARKER_RE = re.compile(r"\s*\[source:[^\]]*\]\s*", re.IGNORECASE)
 
 from config.settings import HUGGINGFACE_API_TOKEN, HUGGINGFACE_ENDPOINT_URL, HUGGINGFACE_MODEL
 
@@ -29,9 +34,16 @@ DEFAULT_MODEL = os.getenv("HUGGINGFACE_MODEL", HUGGINGFACE_MODEL)
 DEFAULT_HF_ENDPOINT_URL = os.getenv("HUGGINGFACE_ENDPOINT_URL", HUGGINGFACE_ENDPOINT_URL)
 DEFAULT_TOP_K = int(os.getenv("RAG_TOP_K", "5"))
 FALLBACK_ANSWER = (
-    "I do not have enough protocol context in the retrieved sources to answer "
-    "that safely. Please consult the official EMS protocol or a qualified "
-    "clinical/dispatch supervisor."
+    "I could not find an answer to that in the indexed knowledge base. "
+    "This assistant only uses the documents currently ingested into the RAG "
+    "corpus, which covers:\n\n"
+    "- Medical Priority Dispatch System (MPDS) protocol concepts and structure\n"
+    "- Pittsburgh EMS/Fire dispatch call types and their mapping to MPDS codes\n"
+    "- NEMSIS v3 data dictionary and reference fields\n\n"
+    "Try rephrasing your question around those topics. For anything outside "
+    "this scope (state-specific protocols, individual MPDS dispatch codes not "
+    "yet ingested, etc.), consult the official protocol document or a "
+    "qualified clinical/dispatch supervisor."
 )
 
 SYSTEM_PROMPT = """You are MedAlertAI's EMS and fire dispatch protocol assistant.
@@ -43,8 +55,9 @@ provide medical direction beyond what the retrieved context supports.
 If the context does not contain the answer, say exactly:
 "{fallback_answer}"
 
-When you answer, include concise citations in this format:
-[source: <title or source_id>; chunk: <chunk_index>]
+Do not include source citations, chunk markers, or text like
+"[source: ...; chunk: N]" in your answer; the user sees the sources separately
+in the dashboard.
 
 Retrieved context:
 {context}
@@ -241,6 +254,7 @@ def query(
         raise RagChainError(f"RAG query failed: {exc}") from exc
 
     answer = _extract_answer(raw_result)
+    answer = _CITATION_MARKER_RE.sub(" ", answer).strip()
     documents = raw_result.get("source_documents", []) if isinstance(raw_result, dict) else []
     citations = citations_from_documents(documents)
 

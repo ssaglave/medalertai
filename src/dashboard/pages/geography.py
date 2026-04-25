@@ -295,10 +295,10 @@ def _build_density_map(filters: dict) -> go.Figure:
         marker=dict(
             size=geo["bubble_size"],
             color=geo["call_count"],
-            colorscale="Viridis",
+            colorscale="YlOrRd",
             cmin=geo["call_count"].min(),
             cmax=geo["call_count"].max(),
-            colorbar=dict(title="Calls", x=0.01, xanchor="left",
+            colorbar=dict(title="Calls", x=0.99, xanchor="right",
                           bgcolor="rgba(26,26,46,0.8)",
                           tickfont=dict(color="#e0e0e0")),
             opacity=0.75,
@@ -374,45 +374,6 @@ def _build_density_map(filters: dict) -> go.Figure:
         ),
         title=dict(text="Call Density & DBSCAN Hotspot Clusters",
                    x=0.5, font=dict(size=16, color="#e0e0e0")),
-    )
-    return fig
-
-
-# ── Map: density heatmap variant ─────────────────────────────────
-def _build_heatmap(filters: dict) -> go.Figure:
-    density = _filtered_density(filters)
-    geo = _cbg_centroids(density)
-    fig = go.Figure()
-
-    if geo.empty:
-        fig.update_layout(template="plotly_dark",
-                          paper_bgcolor="rgba(0,0,0,0)",
-                          height=300,
-                          annotations=[dict(text="No geo data",
-                                           showarrow=False)])
-        return fig
-
-    fig.add_trace(go.Densitymapbox(
-        lat=geo["latitude"],
-        lon=geo["longitude"],
-        z=geo["call_count"],
-        colorscale="Hot",
-        radius=14,
-        opacity=0.75,
-        hovertemplate="<b>Density:</b> %{z:.0f}<extra></extra>",
-        name="Call Density",
-    ))
-
-    clat, clon = _map_centre(geo)
-    fig.update_layout(
-        template="plotly_dark",
-        paper_bgcolor="rgba(0,0,0,0)",
-        mapbox=dict(style="open-street-map",
-                    center=dict(lat=clat, lon=clon), zoom=10),
-        height=300,
-        margin=dict(l=0, r=0, t=35, b=0),
-        title=dict(text="Call Density Heatmap",
-                   x=0.5, font=dict(size=14, color="#e0e0e0")),
     )
     return fig
 
@@ -648,8 +609,7 @@ layout = dbc.Container([
             ]),
             html.Hr(style={"borderColor": "#333"}),
             dbc.Row([
-                dbc.Col(dcc.Graph(id="geo-heatmap"), md=6),
-                dbc.Col(dcc.Graph(id="geo-city-bar"), md=6),
+                dbc.Col(dcc.Graph(id="geo-city-bar"), md=12),
             ], className="mt-3 mb-4"),
         ]),
 
@@ -688,11 +648,6 @@ def _cb_kpi_row(filters):
 @callback(Output("geo-density-map", "figure"), Input("global-filter-store", "data"))
 def _cb_density_map(filters):
     return _build_density_map(filters or {})
-
-
-@callback(Output("geo-heatmap", "figure"), Input("global-filter-store", "data"))
-def _cb_heatmap(filters):
-    return _build_heatmap(filters or {})
 
 
 @callback(Output("geo-city-bar", "figure"), Input("global-filter-store", "data"))

@@ -11,8 +11,10 @@ Charts:
   2. Slope Chart - volume shifts in top incident categories
      from earliest year to latest year in the data
 
-Data source: data/processed/fact_dispatch_clean.parquet
-Listens to: dcc.Store('global-filters') set by components/filters.py
+Data sources (pre-aggregated by scripts/build_temporal_aggregates.py):
+  - data/processed/temporal_heatmap_agg.parquet
+  - data/processed/temporal_slope_agg.parquet
+Listens to: dcc.Store('global-filter-store') set by components/filters.py
 """
 
 from __future__ import annotations
@@ -36,7 +38,8 @@ dash.register_page(
 )
 
 _REPO_ROOT = Path(__file__).resolve().parents[3]
-PARQUET_PATH = _REPO_ROOT / "data" / "processed" / "fact_dispatch_clean.parquet"
+HEATMAP_AGG_PATH = _REPO_ROOT / "data" / "processed" / "temporal_heatmap_agg.parquet"
+SLOPE_AGG_PATH = _REPO_ROOT / "data" / "processed" / "temporal_slope_agg.parquet"
 
 ACCENT_RED = "#E84545"
 GRID_COLOR = "rgba(255,255,255,0.08)"
@@ -52,103 +55,67 @@ PLOTLY_LAYOUT = dict(
     yaxis=dict(gridcolor=GRID_COLOR, showline=False),
 )
 
-_df_cache: pd.DataFrame | None = None
+_heatmap_cache: pd.DataFrame | None = None
+_slope_cache: pd.DataFrame | None = None
 
 
-def _load_data() -> pd.DataFrame:
-    global _df_cache
-    if _df_cache is not None:
-        return _df_cache
-
-    if not PARQUET_PATH.exists():
-        _df_cache = _synthetic_sample()
-        return _df_cache
-
-    df = pd.read_parquet(PARQUET_PATH)
-
-    # Normalise column names to lowercase for robustness.
-    df.columns = [c.lower() for c in df.columns]
-
-    # Accept either naming convention without creating duplicate columns.
-    # The parquet may contain both call_year/year and call_quarter/quarter.
-    if "call_year" in df.columns:
-        if "year" in df.columns:
-            df["year"] = df["year"].combine_first(df["call_year"])
-        else:
-            df["year"] = df["call_year"]
-
-    if "call_quarter" in df.columns:
-        if "quarter" in df.columns:
-            df["quarter"] = df["quarter"].combine_first(df["call_quarter"])
-        else:
-            df["quarter"] = df["call_quarter"]
-
-    if "service_type" in df.columns:
-        if "service" in df.columns:
-            df["service"] = df["service"].combine_first(df["service_type"])
-        else:
-            df["service"] = df["service_type"]
-
-    if "description_short" in df.columns and "call_type" not in df.columns:
-        df["call_type"] = df["description_short"]
-
-    df["year"] = pd.to_numeric(df["year"], errors="coerce")
-
-    df["quarter"] = (
-        df["quarter"]
-        .astype("string")
-        .str.upper()
-        .str.replace("QUARTER ", "Q", regex=False)
-        .str.replace(" ", "", regex=False)
-    )
-    df["quarter"] = df["quarter"].replace(
-        {
-            "1": "Q1",
-            "2": "Q2",
-            "3": "Q3",
-            "4": "Q4",
-        }
-    )
-
-    df["service"] = df["service"].astype("string").str.strip()
-    df["call_type"] = df["call_type"].astype("string").fillna("Unknown").str.strip()
-
-    _df_cache = df
-    return _df_cache
+def _load_heatmap_agg() -> pd.DataFrame:
+    global _heatmap_cache
+    if _heatmap_cache is not None:
+        return _heatmap_cache
+    if HEATMAP_AGG_PATH.exists():
+        _heatmap_cache = pd.read_parquet(HEATMAP_AGG_PATH)
+    else:
+        _heatmap_cache = _synthetic_heatmap_agg()
+    return _heatmap_cache
 
 
-def _synthetic_sample() -> pd.DataFrame:
+def _load_slope_agg() -> pd.DataFrame:
+    global _slope_cache
+    if _slope_cache is not None:
+        return _slope_cache
+    if SLOPE_AGG_PATH.exists():
+        _slope_cache = pd.read_parquet(SLOPE_AGG_PATH)
+    else:
+        _slope_cache = _synthetic_slope_agg()
+    return _slope_cache
+
+
+def _synthetic_heatmap_agg() -> pd.DataFrame:
     rng = np.random.default_rng(42)
-    years = [2020, 2021, 2022, 2023]
-    quarters = ["Q1", "Q2", "Q3", "Q4"]
-    services = ["EMS", "Fire"]
-    call_types = [
-        "FALL",
-        "CHEST PAIN",
-        "BREATHING PROBLEM",
-        "UNCONSCIOUS",
-        "BACK PAIN",
-        "NATURAL GAS ISSUE",
-        "VEHICLE ACCIDENT",
-        "FIRE ALARM",
-        "TRAUMA",
-    ]
-
     rows = []
-    for year in years:
-        for quarter in quarters:
-            n = rng.integers(200, 800)
-            for _ in range(int(n)):
+    for year in [2020, 2021, 2022, 2023]:
+        for quarter in ["Q1", "Q2", "Q3", "Q4"]:
+            for service in ["EMS", "Fire"]:
                 rows.append(
                     {
                         "year": year,
                         "quarter": quarter,
-                        "service": rng.choice(services),
-                        "call_type": rng.choice(call_types),
-                        "completeness_score": float(rng.uniform(0.6, 1.0)),
+                        "service": service,
+                        "call_count": int(rng.integers(200, 800)),
                     }
                 )
+    return pd.DataFrame(rows)
 
+
+def _synthetic_slope_agg() -> pd.DataFrame:
+    rng = np.random.default_rng(42)
+    call_types = [
+        "FALL", "CHEST PAIN", "BREATHING PROBLEM", "UNCONSCIOUS", "BACK PAIN",
+        "NATURAL GAS ISSUE", "VEHICLE ACCIDENT", "FIRE ALARM", "TRAUMA",
+    ]
+    rows = []
+    for year in [2020, 2021, 2022, 2023]:
+        for service in ["EMS", "Fire"]:
+            for ct in call_types:
+                rows.append(
+                    {
+                        "year": year,
+                        "service": service,
+                        "call_type": ct,
+                        "call_count": int(rng.integers(20, 400)),
+                    }
+                )
     return pd.DataFrame(rows)
 
 
@@ -182,7 +149,9 @@ def _flag_anomalies(df_agg: pd.DataFrame, value_col: str = "call_count") -> pd.D
                 .replace({"1": "Q1", "2": "Q2", "3": "Q3", "4": "Q4"})
             )
         if {"year", "quarter", "is_anomaly"} <= set(flags.columns):
-            df_agg = df_agg.merge(flags[["year", "quarter", "is_anomaly"]], on=["year", "quarter"], how="left")
+            df_agg = df_agg.merge(
+                flags[["year", "quarter", "is_anomaly"]], on=["year", "quarter"], how="left"
+            )
             df_agg["is_anomaly"] = df_agg["is_anomaly"].fillna(False)
             return df_agg
 
@@ -196,25 +165,20 @@ def _flag_anomalies(df_agg: pd.DataFrame, value_col: str = "call_count") -> pd.D
 
 
 def _build_heatmap(filters: dict) -> go.Figure:
-    df = _load_data()
+    df = _load_heatmap_agg()
 
     selected_years = _selected_years(df, filters)
     selected_service = _selected_services(filters)
 
-    mask = df["year"].isin(selected_years)
+    services_upper = [s.upper() for s in selected_service]
+    mask = df["year"].isin(selected_years) & df["service"].str.upper().isin(services_upper)
 
-    if "service" in df.columns:
-        mask &= df["service"].str.upper().isin([s.upper() for s in selected_service])
-
-    if "service" in df.columns:
-        df_ems = df[mask & (df["service"].str.upper() == "EMS")].copy()
-    else:
-        df_ems = df[mask].copy()
+    df_ems = df[mask & (df["service"].str.upper() == "EMS")].copy()
 
     df_agg = (
-        df_ems.groupby(["year", "quarter"], observed=True)
-        .size()
-        .reset_index(name="call_count")
+        df_ems.groupby(["year", "quarter"], observed=True)["call_count"]
+        .sum()
+        .reset_index()
     )
 
     if df_agg.empty:
@@ -272,24 +236,16 @@ def _build_heatmap(filters: dict) -> go.Figure:
 
 
 def _build_slope_chart(filters: dict) -> go.Figure:
-    df = _load_data()
-
-    if "call_type" not in df.columns:
-        fig = go.Figure()
-        fig.update_layout(**PLOTLY_LAYOUT, title="call_type column not available")
-        return fig
+    df = _load_slope_agg()
 
     selected_years = _selected_years(df, filters)
     selected_service = _selected_services(filters)
 
-    mask = df["year"].isin(selected_years)
-
-    if "service" in df.columns:
-        mask &= df["service"].str.upper().isin([s.upper() for s in selected_service])
-
+    services_upper = [s.upper() for s in selected_service]
+    mask = df["year"].isin(selected_years) & df["service"].str.upper().isin(services_upper)
     df_f = df[mask].copy()
 
-    if df_f.empty or "year" not in df_f.columns:
+    if df_f.empty:
         fig = go.Figure()
         fig.update_layout(**PLOTLY_LAYOUT, title="No data for selected filters")
         return fig
@@ -308,8 +264,8 @@ def _build_slope_chart(filters: dict) -> go.Figure:
     df_ends = df_f[df_f["year"].isin([year_min, year_max])]
 
     counts = (
-        df_ends.groupby(["year", "call_type"], observed=True)
-        .size()
+        df_ends.groupby(["year", "call_type"], observed=True)["call_count"]
+        .sum()
         .reset_index(name="count")
     )
 
@@ -464,13 +420,19 @@ def layout() -> html.Div:
 
 @callback(
     Output("temporal-heatmap", "figure"),
-    Output("temporal-slope", "figure"),
-    Input("global-filters", "data"),
+    Input("global-filter-store", "data"),
     Input("temporal-init-trigger", "data"),
     prevent_initial_call=False,
 )
-def update_charts(filters_data, _trigger):
-    filters = filters_data or {}
-    heatmap_fig = _build_heatmap(filters)
-    slope_fig = _build_slope_chart(filters)
-    return heatmap_fig, slope_fig
+def update_heatmap(filters_data, _trigger):
+    return _build_heatmap(filters_data or {})
+
+
+@callback(
+    Output("temporal-slope", "figure"),
+    Input("global-filter-store", "data"),
+    Input("temporal-init-trigger", "data"),
+    prevent_initial_call=False,
+)
+def update_slope(filters_data, _trigger):
+    return _build_slope_chart(filters_data or {})

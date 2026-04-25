@@ -38,7 +38,6 @@ dash.register_page(__name__, path="/classification-qa",
 # ── Paths ──
 _REPO_ROOT = Path(__file__).resolve().parent.parent.parent.parent
 _CLASSIFIER_DIR = _REPO_ROOT / "models" / "artifacts" / "classifier"
-_PARQUET = _REPO_ROOT / "data" / "processed" / "fact_dispatch_clean.parquet"
 
 # ── Data Loading ──
 try:
@@ -61,11 +60,6 @@ try:
     FEATURE_IMP = pd.read_csv(_CLASSIFIER_DIR / "feature_importance.csv")
 except FileNotFoundError:
     FEATURE_IMP = pd.DataFrame()
-
-try:
-    MAIN_DF = pd.read_parquet(_PARQUET)
-except FileNotFoundError:
-    MAIN_DF = pd.DataFrame()
 
 
 # ── Color Palette ──

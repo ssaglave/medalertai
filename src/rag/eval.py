@@ -1,13 +1,13 @@
 """
 src/rag/eval.py
 
-Phase 3 — RAG evaluation harness.
-Owner: Deekshitha (C5)
+Phase 5 - RAG evaluation harness.
+Owner: Srileakhana (C4)
 
 Responsibilities:
   - Precision@5 test suite: measure how many of the top-5 retrieved chunks
     are actually relevant to a given query (based on ground-truth source_ids).
-  - LLM-as-judge faithfulness scorer: use Claude to score whether the RAG
+  - LLM-as-judge faithfulness scorer: use the configured Llama/Hugging Face
     answer is faithful to the retrieved context (scale 0–3).
   - Latency benchmark: measure query latency and enforce p50 < 3s, p95 < 8s
     targets.
@@ -15,7 +15,7 @@ Responsibilities:
 Dependencies:
   - src.rag.chain  (C4 — Srileakhana): query(), get_retriever(), get_llm()
   - src.rag.vectorstore (C3 — Sanika): get_vectorstore()
-  - config.settings: ANTHROPIC_API_KEY
+  - config.settings: HUGGINGFACE_API_TOKEN, HUGGINGFACE_JUDGE_MODEL
 
 Usage from the repo root:
     python -m src.rag.eval                         # full evaluation suite
@@ -28,24 +28,34 @@ from __future__ import annotations
 
 import json
 import logging
+import math
 import os
+import re
 import statistics
 import time
 from dataclasses import dataclass, field, asdict
 from pathlib import Path
 from typing import Any, Optional
 
-from config.settings import ANTHROPIC_API_KEY, PROJECT_ROOT
+from config.settings import (
+    HUGGINGFACE_API_TOKEN,
+    HUGGINGFACE_MODEL,
+    RAG_EVAL_RESULTS_DIR,
+    RAG_FAITHFULNESS_AVG_TARGET,
+    RAG_LATENCY_P50_TARGET_S,
+    RAG_LATENCY_P95_TARGET_S,
+    RAG_PRECISION_AT_K_TARGET,
+)
 
 log = logging.getLogger("medalertai.rag.eval")
 
 # ── Targets ──
-PRECISION_AT_K_TARGET = 0.6       # Precision@5 > 0.6
-FAITHFULNESS_AVG_TARGET = 1.5     # LLM-as-judge mean faithfulness > 1.5 (0–3 scale)
-LATENCY_P50_TARGET_S = 3.0        # p50 latency < 3 seconds
-LATENCY_P95_TARGET_S = 8.0        # p95 latency < 8 seconds
+PRECISION_AT_K_TARGET = RAG_PRECISION_AT_K_TARGET
+FAITHFULNESS_AVG_TARGET = RAG_FAITHFULNESS_AVG_TARGET
+LATENCY_P50_TARGET_S = RAG_LATENCY_P50_TARGET_S
+LATENCY_P95_TARGET_S = RAG_LATENCY_P95_TARGET_S
 
-EVAL_RESULTS_DIR = PROJECT_ROOT / "eval_results"
+EVAL_RESULTS_DIR = RAG_EVAL_RESULTS_DIR
 DEFAULT_K = 5
 
 # ── Ground-Truth Evaluation Queries ──
@@ -112,6 +122,41 @@ EVAL_QUERIES: list[dict[str, Any]] = [
 # ═══════════════════════════════════════════════════════════════════════
 # Data classes for evaluation results
 # ═══════════════════════════════════════════════════════════════════════
+
+SOURCE_ID_METADATA_KEYS = (
+    "source_id",
+    "source",
+    "source_file",
+    "file_name",
+    "title",
+    "category",
+)
+
+
+def normalize_source_id(value: Any) -> str:
+    """Normalize source identifiers from Chroma/LangChain metadata."""
+    text = str(value or "").strip().lower()
+    if not text:
+        return ""
+    text = text.replace("\\", "/").rsplit("/", 1)[-1]
+    for suffix in (".md", ".txt", ".pdf", ".json", ".jsonl"):
+        if text.endswith(suffix):
+            text = text[: -len(suffix)]
+            break
+    return re.sub(r"[^a-z0-9]+", "_", text).strip("_")
+
+
+def extract_source_ids(metadata: dict[str, Any]) -> set[str]:
+    """Return normalized source identifiers available in document metadata."""
+    source_ids: set[str] = set()
+    for key in SOURCE_ID_METADATA_KEYS:
+        value = metadata.get(key)
+        if isinstance(value, (list, tuple, set)):
+            source_ids.update(normalize_source_id(item) for item in value)
+        else:
+            source_ids.add(normalize_source_id(value))
+    return {source_id for source_id in source_ids if source_id}
+
 
 @dataclass
 class PrecisionResult:
@@ -223,7 +268,7 @@ def evaluate_precision_at_k(
 
     for entry in eval_queries:
         question = entry["question"]
-        expected = set(entry["relevant_source_ids"])
+        expected = {normalize_source_id(sid) for sid in entry["relevant_source_ids"]}
         category = entry.get("category", "")
 
         try:
@@ -233,12 +278,19 @@ def evaluate_precision_at_k(
             docs = retriever.get_relevant_documents(question)
 
         retrieved_ids = []
+        relevant = []
         for doc in docs[:k]:
             meta = getattr(doc, "metadata", {}) or {}
-            sid = str(meta.get("source_id", "") or meta.get("source", ""))
+            candidate_ids = extract_source_ids(meta)
+            sid = (
+                normalize_source_id(meta.get("source_id"))
+                or normalize_source_id(meta.get("source"))
+                or next(iter(candidate_ids), "")
+            )
             retrieved_ids.append(sid)
+            if expected & candidate_ids:
+                relevant.append(sid)
 
-        relevant = [sid for sid in retrieved_ids if sid in expected]
         precision = len(relevant) / k if k > 0 else 0.0
 
         results.append(PrecisionResult(
@@ -390,13 +442,15 @@ def _run_faithfulness_single(
 
 def _parse_faithfulness_response(text: str) -> dict[str, Any]:
     """Parse the LLM judge's JSON response."""
-    import re
-
-    # Try to extract JSON from the response
-    json_match = re.search(r'\{[^}]+\}', text)
+    # Try to extract JSON from the response, including fenced JSON blocks.
+    candidates = [text]
+    json_match = re.search(r"\{.*\}", text, flags=re.DOTALL)
     if json_match:
+        candidates.insert(0, json_match.group())
+
+    for candidate in candidates:
         try:
-            data = json.loads(json_match.group())
+            data = json.loads(candidate.strip())
             score = float(data.get("score", 0))
             score = max(0.0, min(3.0, score))  # Clamp to [0, 3]
             return {
@@ -404,13 +458,14 @@ def _parse_faithfulness_response(text: str) -> dict[str, Any]:
                 "reasoning": str(data.get("reasoning", "")),
             }
         except (json.JSONDecodeError, TypeError, ValueError):
-            pass
+            continue
 
     # Fallback: try to find a numeric score in the text
-    score_match = re.search(r'score["\s:]+(\d)', text)
+    score_match = re.search(r'score["\s:]+(-?\d+(?:\.\d+)?)', text, flags=re.IGNORECASE)
     if score_match:
+        score = float(score_match.group(1))
         return {
-            "score": float(score_match.group(1)),
+            "score": max(0.0, min(3.0, score)),
             "reasoning": text.strip(),
         }
 
@@ -418,29 +473,23 @@ def _parse_faithfulness_response(text: str) -> dict[str, Any]:
 
 
 def _get_judge_llm() -> Any:
-    """Get the LLM used as a faithfulness judge."""
-    api_key = ANTHROPIC_API_KEY or os.getenv("ANTHROPIC_API_KEY", "")
+    """Get the configured Llama/Hugging Face LLM used as a faithfulness judge."""
+    api_key = HUGGINGFACE_API_TOKEN or os.getenv("HUGGINGFACE_API_TOKEN", "")
     if not api_key:
         raise RuntimeError(
-            "ANTHROPIC_API_KEY is required for LLM-as-judge faithfulness evaluation. "
+            "HUGGINGFACE_API_TOKEN is required for LLM-as-judge faithfulness evaluation. "
             "Set it in .env or as an environment variable."
         )
 
     try:
-        from langchain_anthropic import ChatAnthropic
+        from src.rag.chain import get_llm
     except ImportError as exc:
         raise RuntimeError(
-            "langchain-anthropic is required for faithfulness evaluation."
+            "src.rag.chain.get_llm is required for faithfulness evaluation."
         ) from exc
 
-    model = os.getenv("ANTHROPIC_JUDGE_MODEL", "claude-haiku-4-5")
-    return ChatAnthropic(
-        model=model,
-        anthropic_api_key=api_key,
-        temperature=0.0,
-        timeout=30,
-        max_retries=2,
-    )
+    model = os.getenv("HUGGINGFACE_JUDGE_MODEL", HUGGINGFACE_MODEL)
+    return get_llm(model=model, temperature=0.0)
 
 
 # ═══════════════════════════════════════════════════════════════════════
@@ -510,11 +559,10 @@ def compute_latency_percentiles(
 
     successful.sort()
     n = len(successful)
-    p50_idx = int(n * 0.50)
-    p95_idx = min(int(n * 0.95), n - 1)
+    p95_idx = min(max(math.ceil(n * 0.95) - 1, 0), n - 1)
 
     return {
-        "p50": successful[p50_idx],
+        "p50": statistics.median(successful),
         "p95": successful[p95_idx],
         "mean": statistics.mean(successful),
         "min": successful[0],
@@ -672,7 +720,7 @@ def main(argv: Optional[list[str]] = None) -> int:
     )
 
     parser = argparse.ArgumentParser(
-        description="MedAlertAI Phase 3 RAG evaluation suite (C5 — Deekshitha)",
+        description="MedAlertAI Phase 5 RAG evaluation suite (C4 - Srileakhana)",
     )
     parser.add_argument("--precision-only", action="store_true", help="Run Precision@5 only.")
     parser.add_argument("--faithfulness-only", action="store_true", help="Run faithfulness only.")

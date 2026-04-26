@@ -10,5 +10,6 @@
   "early_stopping": true,
   "n_iter_no_change": 15,
   "validation_fraction": 0.1,
-  "verbose": 1
+  "verbose": 1,
+  "class_weight": "balanced"
 }

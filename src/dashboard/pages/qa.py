@@ -61,6 +61,18 @@ try:
 except FileNotFoundError:
     FEATURE_IMP = pd.DataFrame()
 
+try:
+    _cm_long = pd.read_parquet(_CLASSIFIER_DIR / "confusion_matrix.parquet")
+    CONFUSION_MATRIX = _cm_long.set_index("true_mpds_group")
+except FileNotFoundError:
+    CONFUSION_MATRIX = pd.DataFrame()
+
+try:
+    with open(_CLASSIFIER_DIR / "disagreement_flagging_eval.json") as f:
+        DISAGREE_EVAL = json.load(f)
+except FileNotFoundError:
+    DISAGREE_EVAL = {}
+
 
 # ── Color Palette ──
 COLORS = {
@@ -199,10 +211,12 @@ def _build_agreement_table(df: pd.DataFrame) -> dash_table.DataTable:
     summary["matches"] = summary["matches"].astype(int)
     summary["disagreements"] = summary["disagreements"].astype(int)
 
-    # Assign status badge
+    # Assign status badge — tuned to the 9-class collapsed model where
+    # per-class recall ranges roughly 14–86%. Old bar (>=99 / >=90) made
+    # every group look like Mismatch; this scales to the model we have.
     summary["status"] = summary["accuracy_pct"].apply(
-        lambda x: "✅ Match" if x >= 99
-                  else ("⚠️ Review" if x >= 90 else "❌ Mismatch")
+        lambda x: "✅ Match" if x >= 70
+                  else ("⚠️ Review" if x >= 50 else "❌ Mismatch")
     )
 
     display_cols = ["mpds_group", "total", "matches", "disagreements",
@@ -377,9 +391,9 @@ def _build_agreement_bar(df: pd.DataFrame) -> go.Figure:
     grp.columns = ["Group", "Accuracy", "Count"]
     grp["Accuracy_pct"] = (grp["Accuracy"] * 100).round(2)
 
-    # Color by accuracy
-    colors = [COLORS["success"] if a >= 99
-              else (COLORS["warning"] if a >= 90 else COLORS["mismatch"])
+    # Color by accuracy — same thresholds as the agreement DataTable.
+    colors = [COLORS["success"] if a >= 70
+              else (COLORS["warning"] if a >= 50 else COLORS["mismatch"])
               for a in grp["Accuracy_pct"]]
 
     fig = go.Figure(go.Bar(
@@ -404,9 +418,9 @@ def _build_agreement_bar(df: pd.DataFrame) -> go.Figure:
         paper_bgcolor="rgba(0,0,0,0)",
         plot_bgcolor="rgba(0,0,0,0)",
         margin=dict(t=40, b=10, l=10, r=10),
-        title=dict(text="Agreement Rate by MPDS Group (Top 15)",
+        title=dict(text="Agreement Rate by MPDS Group",
                    x=0.5, font=dict(size=16)),
-        xaxis=dict(title="Accuracy %", range=[85, 100.5]),
+        xaxis=dict(title="Accuracy %", range=[0, 100]),
         yaxis_title="",
     )
     return fig
@@ -500,6 +514,98 @@ def _build_confidence_histogram(df: pd.DataFrame) -> go.Figure:
     return fig
 
 
+def _build_confusion_heatmap(cm: pd.DataFrame) -> go.Figure:
+    """Row-normalized confusion matrix heatmap (true class → predicted distribution)."""
+    if cm.empty:
+        return go.Figure()
+
+    row_totals = cm.sum(axis=1).replace(0, 1)
+    cm_norm = cm.div(row_totals, axis=0) * 100
+
+    fig = go.Figure(data=go.Heatmap(
+        z=cm_norm.values,
+        x=list(cm_norm.columns),
+        y=list(cm_norm.index),
+        colorscale="Magma",
+        zmin=0, zmax=100,
+        colorbar=dict(title="% of true class", ticksuffix="%"),
+        hovertemplate=(
+            "True: %{y}<br>"
+            "Predicted: %{x}<br>"
+            "Share of true class: %{z:.1f}%<extra></extra>"
+        ),
+        text=cm_norm.round(1).values,
+        texttemplate="%{text}",
+        textfont=dict(size=10, color="white"),
+    ))
+
+    fig.update_layout(
+        template="plotly_dark",
+        paper_bgcolor="rgba(0,0,0,0)",
+        plot_bgcolor="rgba(0,0,0,0)",
+        margin=dict(t=40, b=80, l=120, r=20),
+        title=dict(text="Confusion Matrix (row-normalized)",
+                   x=0.5, font=dict(size=16)),
+        xaxis=dict(title="Predicted class", tickangle=-45),
+        yaxis=dict(title="True class", autorange="reversed"),
+    )
+    return fig
+
+
+def _build_threshold_sweep(report: dict) -> go.Figure:
+    """Recall / false-alarm / precision-proxy across confidence thresholds."""
+    sweep = sorted(report.get("sweep", []), key=lambda r: r["threshold"])
+    if not sweep:
+        return go.Figure()
+
+    thresholds = [row["threshold"] for row in sweep]
+    recall = [row["recall_on_injected"] for row in sweep]
+    false_alarm = [row["false_alarm_rate"] for row in sweep]
+    precision = [row["precision_proxy"] for row in sweep]
+
+    fig = go.Figure()
+    fig.add_trace(go.Scatter(
+        x=thresholds, y=recall, mode="lines+markers",
+        name="Recall on injected errors",
+        line=dict(color=COLORS["accent"], width=3),
+        marker=dict(size=8),
+    ))
+    fig.add_trace(go.Scatter(
+        x=thresholds, y=precision, mode="lines+markers",
+        name="Precision (proxy)",
+        line=dict(color=COLORS["ems"], width=3),
+        marker=dict(size=8),
+    ))
+    fig.add_trace(go.Scatter(
+        x=thresholds, y=false_alarm, mode="lines+markers",
+        name="False-alarm rate",
+        line=dict(color=COLORS["mismatch"], width=2, dash="dash"),
+        marker=dict(size=7),
+    ))
+
+    default_thr = report.get("default_threshold")
+    if default_thr is not None:
+        fig.add_vline(
+            x=default_thr,
+            line_dash="dot", line_color=COLORS["warning"],
+            annotation_text=f"default {default_thr}",
+            annotation_position="top right",
+        )
+
+    fig.update_layout(
+        template="plotly_dark",
+        paper_bgcolor="rgba(0,0,0,0)",
+        plot_bgcolor="rgba(0,0,0,0)",
+        margin=dict(t=40, b=10, l=10, r=10),
+        title=dict(text="Disagreement-flag Recall vs Confidence Threshold",
+                   x=0.5, font=dict(size=16)),
+        xaxis=dict(title="Confidence threshold"),
+        yaxis=dict(title="Rate", range=[0, 1]),
+        legend=dict(orientation="h", y=-0.2),
+    )
+    return fig
+
+
 # ═══════════════════════════════════════════════════════════════
 # Layout
 # ═══════════════════════════════════════════════════════════════
@@ -548,6 +654,24 @@ layout = dbc.Container([
     # Confidence Distribution
     dbc.Row([
         dbc.Col(dcc.Graph(id="qa-confidence-hist"), md=12),
+    ], className="mb-4"),
+
+    html.Hr(style={"borderColor": "#333"}),
+
+    # Confusion matrix + Disagreement-flag threshold sweep (static — model-level)
+    dbc.Row([
+        dbc.Col([
+            html.H5("🔍 Confusion Matrix",
+                     className="mb-3", style={"fontWeight": "600"}),
+            dcc.Graph(figure=_build_confusion_heatmap(CONFUSION_MATRIX),
+                      id="qa-confusion-matrix"),
+        ], md=7),
+        dbc.Col([
+            html.H5("🎚️ Disagreement-flag Sweep",
+                     className="mb-3", style={"fontWeight": "600"}),
+            dcc.Graph(figure=_build_threshold_sweep(DISAGREE_EVAL),
+                      id="qa-threshold-sweep"),
+        ], md=5),
     ], className="mb-4"),
 
 ])

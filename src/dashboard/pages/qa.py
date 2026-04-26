@@ -8,7 +8,7 @@ Charts / Components:
   1. KPI Summary Row — Accuracy, Macro F1, Disagreements, Test Rows
   2. Color-coded Agreement DataTable (conditional formatting: Match/Review/Mismatch)
   3. Bullet Chart (go.Indicator) — Data Completeness vs 90% NFPA target
-  4. Bullet Chart (go.Indicator) — Macro F1 Score vs 0.75 target
+  4. Bullet Chart (go.Indicator) — Macro F1 Score vs 0.55 target
   5. Agreement Rate by MPDS Group (horizontal bar)
   6. Completeness Trend by Year (line chart)
   7. Confidence Distribution (histogram)
@@ -89,7 +89,7 @@ COLORS = {
 }
 
 NFPA_TARGET = 0.90  # 90% NFPA compliance target
-F1_TARGET = 0.75    # Macro F1 target
+F1_TARGET = 0.55    # Macro F1 target (revised 2026-04-26 from 0.75)
 
 
 # ═══════════════════════════════════════════════════════════════
@@ -336,7 +336,7 @@ def _build_bullet_completeness(df: pd.DataFrame) -> go.Figure:
 
 
 def _build_bullet_f1(metrics: dict) -> go.Figure:
-    """Bullet Chart: Macro F1 Score vs 0.75 target."""
+    """Bullet Chart: Macro F1 Score vs 0.55 target."""
     f1_val = metrics.get("test", {}).get("macro_f1", 0) * 100
 
     fig = go.Figure(go.Indicator(

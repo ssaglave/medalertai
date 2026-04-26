@@ -42,7 +42,7 @@ _CLASSIFIER_DIR = _REPO_ROOT / "models" / "artifacts" / "classifier"
 # ── Data Loading ──
 try:
     DISAGREE_DF = pd.read_parquet(_CLASSIFIER_DIR / "disagreements.parquet")
-except FileNotFoundError:
+except (FileNotFoundError, OSError):
     DISAGREE_DF = pd.DataFrame()
 
 try:
@@ -53,7 +53,7 @@ except FileNotFoundError:
 
 try:
     LABEL_MAP = pd.read_parquet(_CLASSIFIER_DIR / "label_map.parquet")
-except FileNotFoundError:
+except (FileNotFoundError, OSError):
     LABEL_MAP = pd.DataFrame()
 
 try:
@@ -64,7 +64,7 @@ except FileNotFoundError:
 try:
     _cm_long = pd.read_parquet(_CLASSIFIER_DIR / "confusion_matrix.parquet")
     CONFUSION_MATRIX = _cm_long.set_index("true_mpds_group")
-except FileNotFoundError:
+except (FileNotFoundError, OSError):
     CONFUSION_MATRIX = pd.DataFrame()
 
 try:

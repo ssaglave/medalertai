@@ -89,7 +89,7 @@ COLORS = {
 }
 
 NFPA_TARGET = 0.90  # 90% NFPA compliance target
-F1_TARGET = 0.55    # Macro F1 target (revised 2026-04-26 from 0.75)
+F1_TARGET = 0.55    # Macro F1 target (revised from 0.75)
 
 
 # ═══════════════════════════════════════════════════════════════

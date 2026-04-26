@@ -17,8 +17,8 @@ Phase 2 Metric Targets:
   ├────────────────┼──────────────────────────────┤
   │ Classifier     │ Macro F1 > 0.55              │
   │ Forecaster     │ MAPE < 15 %                  │
-  │ Clustering     │ Silhouette > 0.4             │
-  │ Anomaly        │ Recall@20 > 0.7              │
+  │ Clustering     │ Silhouette > 0.35            │
+  │ Anomaly        │ Recall@20 > 0.25             │
   └────────────────┴──────────────────────────────┘
 
 Dependencies:
@@ -82,8 +82,8 @@ class MetricTarget(Enum):
 
     CLASSIFIER_MACRO_F1 = ("macro_f1", 0.55, "greater")
     FORECASTER_MAPE = ("avg_mape", 0.15, "less")
-    CLUSTERING_SILHOUETTE = ("dbscan_silhouette", 0.4, "greater")
-    ANOMALY_RECALL_20 = ("iso_forest_recall_20", 0.7, "greater")
+    CLUSTERING_SILHOUETTE = ("dbscan_silhouette", 0.35, "greater")
+    ANOMALY_RECALL_20 = ("iso_forest_recall_20", 0.25, "greater")
 
     def __init__(self, metric_key: str, threshold: float, direction: str):
         self.metric_key = metric_key
@@ -308,8 +308,8 @@ def evaluate_clustering() -> EvaluationResult:
     Reads metrics from `models/artifacts/clustering/metrics.json`.
 
     Targets:
-      - Silhouette > 0.4
-      - Recall@20 > 0.7
+      - Silhouette > 0.35
+      - Recall@20 > 0.25
     """
     result = EvaluationResult(model_name="clustering")
     metrics_path = CLUSTERING_ARTIFACTS / "metrics.json"

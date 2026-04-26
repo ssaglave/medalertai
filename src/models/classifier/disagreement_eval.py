@@ -170,10 +170,16 @@ def _prepare_test_features(
     test_df: pd.DataFrame,
     label_encoder,
 ) -> tuple[pd.DataFrame, np.ndarray]:
-    """Apply the MPDS mapper, encode labels, return feature DF + true codes."""
+    """Apply the MPDS mapper, encode labels, return feature DF + true codes.
+
+    If the model was trained with a collapsed label set (top-N + Other), any
+    raw MPDS class outside the encoder's known classes is mapped to 'Other'
+    so the harness can run against the same label space the model saw.
+    """
     from src.models.classifier.train import (
         ALL_FEATURES,
         CATEGORICAL_FEATURES,
+        OTHER_LABEL,
         TARGET_COL,
         add_mpds_target,
     )
@@ -181,6 +187,12 @@ def _prepare_test_features(
     df = add_mpds_target(test_df.copy())
     for col in CATEGORICAL_FEATURES:
         df[col] = df[col].astype(str)
+
+    known_classes = set(label_encoder.classes_)
+    if OTHER_LABEL in known_classes:
+        df[TARGET_COL] = df[TARGET_COL].where(
+            df[TARGET_COL].isin(known_classes), OTHER_LABEL,
+        )
 
     y_codes = label_encoder.transform(df[TARGET_COL]).astype(np.int32)
     return df[ALL_FEATURES], y_codes

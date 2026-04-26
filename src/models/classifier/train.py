@@ -179,6 +179,40 @@ def add_mpds_target(df: pd.DataFrame) -> pd.DataFrame:
     return df
 
 
+OTHER_LABEL = "Other"
+
+
+def collapse_long_tail(
+    train: pd.DataFrame,
+    val: pd.DataFrame,
+    test: pd.DataFrame,
+    top_n: int,
+    other_label: str = OTHER_LABEL,
+) -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame, list[str]]:
+    """Roll classes outside the top-N (by train frequency) into a single 'Other' bucket.
+
+    Macro F1 averages every class equally, so a long tail of rare classes the
+    model can never learn (e.g. Drowning at 830 train rows out of 2.3M) drives
+    macro F1 toward zero. Collapsing them lets the metric reflect performance
+    on the classes that actually carry volume.
+    """
+    counts = train[TARGET_COL].value_counts()
+    if top_n >= len(counts):
+        log.info("top_n=%d >= total classes=%d — no collapse applied", top_n, len(counts))
+        return train, val, test, counts.index.tolist()
+
+    top_classes = counts.head(top_n).index.tolist()
+    log.info("Collapsing %d-class target → top-%d + '%s'", len(counts), top_n, other_label)
+    log.info("  Kept classes: %s", top_classes)
+
+    def _collapse(df: pd.DataFrame) -> pd.DataFrame:
+        df = df.copy()
+        df[TARGET_COL] = df[TARGET_COL].where(df[TARGET_COL].isin(top_classes), other_label)
+        return df
+
+    return _collapse(train), _collapse(val), _collapse(test), top_classes + [other_label]
+
+
 def encode_target(
     train: pd.DataFrame,
     val: pd.DataFrame,
@@ -700,6 +734,7 @@ def run_training(
     skip_hpo: bool = False,
     use_mlflow: bool = True,
     confidence_threshold: float = 0.7,
+    top_n_classes: Optional[int] = None,
 ) -> dict:
     """
     Full training pipeline:
@@ -726,6 +761,12 @@ def run_training(
     train_df = add_mpds_target(train_df)
     val_df = add_mpds_target(val_df)
     test_df = add_mpds_target(test_df)
+
+    # 2b. (Optional) collapse long tail to top-N + Other
+    if top_n_classes is not None and top_n_classes > 0:
+        train_df, val_df, test_df, _kept = collapse_long_tail(
+            train_df, val_df, test_df, top_n=top_n_classes,
+        )
 
     # 3. Encode target
     train_df, val_df, test_df, label_map, label_encoder = encode_target(
@@ -834,6 +875,11 @@ def _parse_args(argv: Optional[list[str]] = None) -> argparse.Namespace:
         "--confidence-threshold", type=float, default=0.7,
         help="Confidence threshold for disagreement flagging (default: 0.7)"
     )
+    parser.add_argument(
+        "--top-n-classes", type=int, default=None,
+        help="If set, collapse classes outside the top-N (by train freq) into 'Other'. "
+             "Mitigates macro-F1 penalty from rare classes (default: keep all)."
+    )
     return parser.parse_args(argv)
 
 
@@ -844,4 +890,5 @@ if __name__ == "__main__":
         skip_hpo=args.skip_hpo,
         use_mlflow=not args.no_mlflow,
         confidence_threshold=args.confidence_threshold,
+        top_n_classes=args.top_n_classes,
     )

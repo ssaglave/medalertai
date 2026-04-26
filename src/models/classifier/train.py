@@ -735,6 +735,7 @@ def run_training(
     use_mlflow: bool = True,
     confidence_threshold: float = 0.7,
     top_n_classes: Optional[int] = None,
+    balanced_classes: bool = False,
 ) -> dict:
     """
     Full training pipeline:
@@ -796,6 +797,11 @@ def run_training(
             n_classes=n_classes,
             n_trials=n_trials,
         )
+
+    # 5b. Optional: balance class weights so rare classes contribute equally
+    if balanced_classes:
+        best_params["class_weight"] = "balanced"
+        log.info("Using class_weight='balanced' on final model")
 
     # 6. Train final model
     model = train_model(X_train, y_train, X_val, y_val, best_params)
@@ -880,6 +886,11 @@ def _parse_args(argv: Optional[list[str]] = None) -> argparse.Namespace:
         help="If set, collapse classes outside the top-N (by train freq) into 'Other'. "
              "Mitigates macro-F1 penalty from rare classes (default: keep all)."
     )
+    parser.add_argument(
+        "--balanced-classes", action="store_true",
+        help="Pass class_weight='balanced' to the final model so rare classes "
+             "contribute equally to the loss."
+    )
     return parser.parse_args(argv)
 
 
@@ -891,4 +902,5 @@ if __name__ == "__main__":
         use_mlflow=not args.no_mlflow,
         confidence_threshold=args.confidence_threshold,
         top_n_classes=args.top_n_classes,
+        balanced_classes=args.balanced_classes,
     )

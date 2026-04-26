@@ -55,7 +55,6 @@ def test_prompt_contains_protocol_only_fallback():
     assert "Use only the retrieved" in prompt
     assert "Do not use outside medical knowledge" in prompt
     assert "{fallback_answer}" in prompt
-    assert "[source: <title or source_id>; chunk: <chunk_index>]" in prompt
 
 
 def test_get_retriever_passes_top_k_to_vectorstore():

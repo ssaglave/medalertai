@@ -1,0 +1,23 @@
+{
+  "forecasting": {
+    "prophet_model": "prophet_model.json",
+    "lightgbm_model": "lightgbm_forecaster.joblib",
+    "ensemble_model": "ensemble_model.joblib",
+    "ensemble_forecast": "ensemble_forecast.parquet",
+    "lightgbm_metadata": "lightgbm_metadata.json",
+    "metrics": "metrics.json"
+  },
+  "ensemble_weights": {
+    "prophet": 0.5,
+    "lightgbm": 0.5
+  },
+  "dashboard_output_columns": [
+    "ds",
+    "prophet_yhat",
+    "lightgbm_yhat",
+    "ensemble_yhat",
+    "yhat",
+    "yhat_lower",
+    "yhat_upper"
+  ]
+}

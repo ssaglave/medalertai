@@ -1,133 +1,133 @@
 {
-  "engine": "HistGradientBoosting",
+  "engine": "LightGBM",
   "validation": {
     "split": "validation",
-    "accuracy": 0.4611,
-    "macro_f1": 0.4455,
-    "weighted_f1": 0.4585,
-    "macro_precision": 0.499,
-    "macro_recall": 0.5281
+    "accuracy": 0.4635,
+    "macro_f1": 0.4471,
+    "weighted_f1": 0.4624,
+    "macro_precision": 0.4931,
+    "macro_recall": 0.5276
   },
   "test": {
     "split": "test",
-    "accuracy": 0.4603,
-    "macro_f1": 0.4446,
-    "weighted_f1": 0.4575,
-    "macro_precision": 0.4981,
-    "macro_recall": 0.5273
+    "accuracy": 0.4632,
+    "macro_f1": 0.4468,
+    "weighted_f1": 0.4619,
+    "macro_precision": 0.4931,
+    "macro_recall": 0.5276
   },
   "n_classes": 9,
   "n_train_rows": 2313502,
-  "training_time_sec": 127.0,
+  "training_time_sec": 3169.6,
   "validation_per_class": {
     "Breathing Problems": {
-      "precision": 0.2268,
-      "recall": 0.7075,
-      "f1": 0.3435,
+      "precision": 0.2284,
+      "recall": 0.6821,
+      "f1": 0.3422,
       "support": 29800
     },
     "EMS Assist": {
-      "precision": 0.8663,
-      "recall": 0.8572,
-      "f1": 0.8617,
+      "precision": 0.8669,
+      "recall": 0.8553,
+      "f1": 0.8611,
       "support": 77380
     },
     "Falls": {
-      "precision": 0.2956,
-      "recall": 0.3752,
-      "f1": 0.3307,
+      "precision": 0.2985,
+      "recall": 0.3787,
+      "f1": 0.3338,
       "support": 39058
     },
     "Fire": {
-      "precision": 0.629,
-      "recall": 0.732,
-      "f1": 0.6766,
+      "precision": 0.6218,
+      "recall": 0.7321,
+      "f1": 0.6724,
       "support": 36030
     },
     "Other": {
-      "precision": 0.9293,
-      "recall": 0.1406,
-      "f1": 0.2442,
+      "precision": 0.8796,
+      "recall": 0.1489,
+      "f1": 0.2548,
       "support": 121861
     },
     "Sick Person": {
-      "precision": 0.3766,
-      "recall": 0.382,
-      "f1": 0.3793,
+      "precision": 0.3814,
+      "recall": 0.3815,
+      "f1": 0.3814,
       "support": 61954
     },
     "Traffic Accident": {
-      "precision": 0.3062,
-      "recall": 0.5444,
-      "f1": 0.392,
+      "precision": 0.3046,
+      "recall": 0.5563,
+      "f1": 0.3936,
       "support": 19752
     },
     "Unconscious": {
-      "precision": 0.1718,
-      "recall": 0.604,
-      "f1": 0.2675,
+      "precision": 0.1688,
+      "recall": 0.5936,
+      "f1": 0.2629,
       "support": 18109
     },
     "Unknown Problem": {
-      "precision": 0.6891,
-      "recall": 0.4104,
-      "f1": 0.5144,
+      "precision": 0.6881,
+      "recall": 0.4202,
+      "f1": 0.5218,
       "support": 91806
     }
   },
   "test_per_class": {
     "Breathing Problems": {
-      "precision": 0.227,
-      "recall": 0.7069,
-      "f1": 0.3436,
+      "precision": 0.2297,
+      "recall": 0.6845,
+      "f1": 0.344,
       "support": 29801
     },
     "EMS Assist": {
-      "precision": 0.8651,
-      "recall": 0.8596,
-      "f1": 0.8623,
+      "precision": 0.866,
+      "recall": 0.8577,
+      "f1": 0.8618,
       "support": 77388
     },
     "Falls": {
-      "precision": 0.2934,
-      "recall": 0.3716,
-      "f1": 0.3279,
+      "precision": 0.2982,
+      "recall": 0.3772,
+      "f1": 0.3331,
       "support": 39059
     },
     "Fire": {
-      "precision": 0.6258,
-      "recall": 0.7293,
-      "f1": 0.6736,
+      "precision": 0.6222,
+      "recall": 0.731,
+      "f1": 0.6722,
       "support": 36037
     },
     "Other": {
-      "precision": 0.9293,
-      "recall": 0.1403,
-      "f1": 0.2439,
+      "precision": 0.8817,
+      "recall": 0.149,
+      "f1": 0.255,
       "support": 121871
     },
     "Sick Person": {
-      "precision": 0.3771,
-      "recall": 0.3811,
-      "f1": 0.3791,
+      "precision": 0.3814,
+      "recall": 0.3814,
+      "f1": 0.3814,
       "support": 61955
     },
     "Traffic Accident": {
-      "precision": 0.3073,
-      "recall": 0.5475,
-      "f1": 0.3936,
+      "precision": 0.3037,
+      "recall": 0.5576,
+      "f1": 0.3932,
       "support": 19746
     },
     "Unconscious": {
-      "precision": 0.1704,
-      "recall": 0.6024,
-      "f1": 0.2656,
+      "precision": 0.1677,
+      "recall": 0.594,
+      "f1": 0.2616,
       "support": 18110
     },
     "Unknown Problem": {
-      "precision": 0.6876,
-      "recall": 0.4071,
-      "f1": 0.5114,
+      "precision": 0.6871,
+      "recall": 0.4164,
+      "f1": 0.5186,
       "support": 91784
     }
   }

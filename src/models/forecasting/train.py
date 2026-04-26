@@ -57,29 +57,43 @@ def load_temporal_data() -> pd.DataFrame:
         sys.exit(1)
         
     df = pd.read_parquet(path)
-    
+
+    # Pick the populated year/quarter columns. The parquet currently carries
+    # both raw (CALL_YEAR, CALL_QUARTER) and canonical (year, quarter) names;
+    # the canonical ones can be all-null when the rename in preprocessing
+    # mis-fires. Prefer whichever one actually has data.
+    def _pick(*candidates):
+        for col in candidates:
+            if col in df.columns and df[col].notna().any():
+                return col
+        return None
+
+    year_col = _pick("year", "CALL_YEAR", "call_year")
+    quarter_col = _pick("quarter", "CALL_QUARTER", "call_quarter")
+    month_col = _pick("month")
+
     if "call_create_time" in df.columns:
         df["ds"] = pd.to_datetime(df["call_create_time"])
     elif "date" in df.columns:
         df["ds"] = pd.to_datetime(df["date"])
+    elif year_col and month_col:
+        df["ds"] = pd.to_datetime(
+            df[year_col].astype(str) + "-" + df[month_col].astype(str).str.zfill(2) + "-01",
+            format="%Y-%m-%d", errors="coerce"
+        )
+    elif year_col and quarter_col:
+        # Quarter may be string ("Q1") or int (1); normalize.
+        q_str = df[quarter_col].astype(str).str.upper()
+        q_str = q_str.where(q_str.str.startswith("Q"), "Q" + q_str)
+        month_map = {"Q1": "01", "Q2": "04", "Q3": "07", "Q4": "10"}
+        df["month_str"] = q_str.map(month_map).fillna("01")
+        df["ds"] = pd.to_datetime(
+            df[year_col].astype("Int64").astype(str) + "-" + df["month_str"] + "-01",
+            format="%Y-%m-%d", errors="coerce"
+        )
     else:
-        # Fallback using 'year' and 'month' from feature engineering if available
-        if "year" in df.columns and "month" in df.columns:
-            df["ds"] = pd.to_datetime(
-                df["year"].astype(str) + "-" + df["month"].astype(str).str.zfill(2) + "-01",
-                format="%Y-%m-%d", errors="coerce"
-            )
-        elif "year" in df.columns and "quarter" in df.columns:
-            # Fallback using 'year' and 'quarter' as a last resort
-            month_map = {"Q1": "01", "Q2": "04", "Q3": "07", "Q4": "10"}
-            df["month_str"] = df["quarter"].map(month_map).fillna("01")
-            df["ds"] = pd.to_datetime(
-                df["year"].astype(str) + "-" + df["month_str"] + "-01",
-                format="%Y-%m-%d", errors="coerce"
-            )
-        else:
-            log.error("Cannot construct 'ds'; required time columns missing.")
-            sys.exit(1)
+        log.error("Cannot construct 'ds'; required time columns missing.")
+        sys.exit(1)
             
     df = df.dropna(subset=["ds"])
     

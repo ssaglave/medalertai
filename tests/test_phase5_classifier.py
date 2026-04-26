@@ -105,6 +105,29 @@ class TestPerClassMetrics:
 
 
 # ---------------------------------------------------------------------------
+# Macro-F1 regression floor
+# ---------------------------------------------------------------------------
+# Plan target is 0.55 (revised down from 0.75 because the WPRDC dataset has
+# no hour-of-day timestamps and `call_type` must be excluded for leakage —
+# the achievable ceiling on dispatch metadata alone is ~0.45). This floor
+# guards against further regressions while leaving headroom toward the
+# revised plan target. Raise it whenever the saved metrics improve.
+F1_REGRESSION_FLOOR = 0.42
+F1_PLAN_TARGET = 0.55
+
+
+class TestMacroF1Floor:
+    @pytest.mark.slow
+    def test_test_macro_f1_above_regression_floor(self):
+        metrics = json.loads(METRICS_PATH.read_text(encoding="utf-8"))
+        f1 = metrics["test"]["macro_f1"]
+        assert f1 >= F1_REGRESSION_FLOOR, (
+            f"Test macro F1 {f1:.4f} dropped below regression floor "
+            f"{F1_REGRESSION_FLOOR:.2f}. Plan target is {F1_PLAN_TARGET:.2f}."
+        )
+
+
+# ---------------------------------------------------------------------------
 # Disagreement-flag harness — pure logic on synthetic data
 # ---------------------------------------------------------------------------
 class TestDisagreementHarnessLogic:

@@ -48,6 +48,8 @@ from sklearn.ensemble import HistGradientBoostingClassifier
 from sklearn.impute import SimpleImputer
 from sklearn.metrics import (
     accuracy_score,
+    classification_report,
+    confusion_matrix,
     f1_score,
     precision_score,
     recall_score,
@@ -175,6 +177,40 @@ def add_mpds_target(df: pd.DataFrame) -> pd.DataFrame:
     df = df.copy()
     df[TARGET_COL] = df["call_type"].apply(map_call_to_mpds)
     return df
+
+
+OTHER_LABEL = "Other"
+
+
+def collapse_long_tail(
+    train: pd.DataFrame,
+    val: pd.DataFrame,
+    test: pd.DataFrame,
+    top_n: int,
+    other_label: str = OTHER_LABEL,
+) -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame, list[str]]:
+    """Roll classes outside the top-N (by train frequency) into a single 'Other' bucket.
+
+    Macro F1 averages every class equally, so a long tail of rare classes the
+    model can never learn (e.g. Drowning at 830 train rows out of 2.3M) drives
+    macro F1 toward zero. Collapsing them lets the metric reflect performance
+    on the classes that actually carry volume.
+    """
+    counts = train[TARGET_COL].value_counts()
+    if top_n >= len(counts):
+        log.info("top_n=%d >= total classes=%d — no collapse applied", top_n, len(counts))
+        return train, val, test, counts.index.tolist()
+
+    top_classes = counts.head(top_n).index.tolist()
+    log.info("Collapsing %d-class target → top-%d + '%s'", len(counts), top_n, other_label)
+    log.info("  Kept classes: %s", top_classes)
+
+    def _collapse(df: pd.DataFrame) -> pd.DataFrame:
+        df = df.copy()
+        df[TARGET_COL] = df[TARGET_COL].where(df[TARGET_COL].isin(top_classes), other_label)
+        return df
+
+    return _collapse(train), _collapse(val), _collapse(test), top_classes + [other_label]
 
 
 def encode_target(
@@ -434,7 +470,11 @@ def evaluate_model(
     label_map: pd.DataFrame,
     split_name: str = "test",
 ) -> dict:
-    """Evaluate model and return metrics dict."""
+    """Evaluate model and return metrics dict.
+
+    Includes confusion matrix and per-class metrics (precision/recall/F1/support)
+    used by the QA dashboard tab and the Phase 5 evaluation tests.
+    """
     y_pred = model.predict(X)
 
     macro_f1 = f1_score(y, y_pred, average="macro", zero_division=0)
@@ -442,6 +482,32 @@ def evaluate_model(
     accuracy = accuracy_score(y, y_pred)
     macro_precision = precision_score(y, y_pred, average="macro", zero_division=0)
     macro_recall = recall_score(y, y_pred, average="macro", zero_division=0)
+
+    class_codes = label_map[LABEL_CODE_COL].tolist()
+    class_names = label_map[TARGET_COL].tolist()
+
+    cm = confusion_matrix(y, y_pred, labels=class_codes)
+    cm_df = pd.DataFrame(cm, index=class_names, columns=class_names)
+    cm_df.index.name = "true_mpds_group"
+
+    report = classification_report(
+        y,
+        y_pred,
+        labels=class_codes,
+        target_names=class_names,
+        output_dict=True,
+        zero_division=0,
+    )
+    per_class = {
+        cls: {
+            "precision": round(stats["precision"], 4),
+            "recall": round(stats["recall"], 4),
+            "f1": round(stats["f1-score"], 4),
+            "support": int(stats["support"]),
+        }
+        for cls, stats in report.items()
+        if cls in class_names
+    }
 
     log.info("=== %s Evaluation ===", split_name.upper())
     log.info("  Accuracy:         %.4f", accuracy)
@@ -462,6 +528,8 @@ def evaluate_model(
         "weighted_f1": round(weighted_f1, 4),
         "macro_precision": round(macro_precision, 4),
         "macro_recall": round(macro_recall, 4),
+        "confusion_matrix": cm_df,
+        "per_class": per_class,
     }
 
 
@@ -524,6 +592,8 @@ def save_artifacts(
     metrics: dict,
     best_params: dict,
     disagreements: pd.DataFrame,
+    confusion_matrix_df: pd.DataFrame,
+    per_class_metrics: dict,
     output_dir: Path = CLASSIFIER_ARTIFACTS_DIR,
 ) -> None:
     """Save all classifier artifacts for downstream dashboard consumption."""
@@ -578,6 +648,20 @@ def save_artifacts(
     disagreements.to_parquet(disagree_path, index=False)
     n_flagged = disagreements["is_disagreement"].sum()
     log.info("Saved disagreements: %s (%d flagged rows)", _display_path(disagree_path), n_flagged)
+
+    # 6b. Confusion matrix (test split) — rows=true class, cols=predicted class
+    cm_path = output_dir / "confusion_matrix.parquet"
+    confusion_matrix_df.reset_index().to_parquet(cm_path, index=False)
+    log.info("Saved confusion matrix: %s (%dx%d)",
+             _display_path(cm_path),
+             confusion_matrix_df.shape[0],
+             confusion_matrix_df.shape[1])
+
+    # 6c. Per-class metrics (test split)
+    per_class_path = output_dir / "per_class_metrics.json"
+    per_class_path.write_text(json.dumps(per_class_metrics, indent=2) + "\n", encoding="utf-8")
+    log.info("Saved per-class metrics: %s (%d classes)",
+             _display_path(per_class_path), len(per_class_metrics))
 
     # 7. Feature importance
     if hasattr(model, "feature_importances_"):
@@ -650,6 +734,8 @@ def run_training(
     skip_hpo: bool = False,
     use_mlflow: bool = True,
     confidence_threshold: float = 0.7,
+    top_n_classes: Optional[int] = None,
+    balanced_classes: bool = False,
 ) -> dict:
     """
     Full training pipeline:
@@ -676,6 +762,12 @@ def run_training(
     train_df = add_mpds_target(train_df)
     val_df = add_mpds_target(val_df)
     test_df = add_mpds_target(test_df)
+
+    # 2b. (Optional) collapse long tail to top-N + Other
+    if top_n_classes is not None and top_n_classes > 0:
+        train_df, val_df, test_df, _kept = collapse_long_tail(
+            train_df, val_df, test_df, top_n=top_n_classes,
+        )
 
     # 3. Encode target
     train_df, val_df, test_df, label_map, label_encoder = encode_target(
@@ -706,12 +798,23 @@ def run_training(
             n_trials=n_trials,
         )
 
+    # 5b. Optional: balance class weights so rare classes contribute equally
+    if balanced_classes:
+        best_params["class_weight"] = "balanced"
+        log.info("Using class_weight='balanced' on final model")
+
     # 6. Train final model
     model = train_model(X_train, y_train, X_val, y_val, best_params)
 
     # 7. Evaluate
     val_metrics = evaluate_model(model, X_val, y_val, label_map, "validation")
     test_metrics = evaluate_model(model, X_test, y_test, label_map, "test")
+
+    # Pull non-JSON artifacts out of the metrics dicts; persist separately.
+    val_metrics.pop("confusion_matrix", None)
+    val_per_class = val_metrics.pop("per_class", {})
+    test_cm_df = test_metrics.pop("confusion_matrix")
+    test_per_class = test_metrics.pop("per_class", {})
 
     all_metrics = {
         "engine": engine,
@@ -720,6 +823,8 @@ def run_training(
         "n_classes": n_classes,
         "n_train_rows": len(train_df),
         "training_time_sec": round(time.time() - start_time, 1),
+        "validation_per_class": val_per_class,
+        "test_per_class": test_per_class,
     }
 
     # 8. Flag disagreements on test set
@@ -737,6 +842,8 @@ def run_training(
         metrics=all_metrics,
         best_params=best_params,
         disagreements=disagreements,
+        confusion_matrix_df=test_cm_df,
+        per_class_metrics=test_per_class,
     )
 
     # 10. MLflow
@@ -774,6 +881,16 @@ def _parse_args(argv: Optional[list[str]] = None) -> argparse.Namespace:
         "--confidence-threshold", type=float, default=0.7,
         help="Confidence threshold for disagreement flagging (default: 0.7)"
     )
+    parser.add_argument(
+        "--top-n-classes", type=int, default=None,
+        help="If set, collapse classes outside the top-N (by train freq) into 'Other'. "
+             "Mitigates macro-F1 penalty from rare classes (default: keep all)."
+    )
+    parser.add_argument(
+        "--balanced-classes", action="store_true",
+        help="Pass class_weight='balanced' to the final model so rare classes "
+             "contribute equally to the loss."
+    )
     return parser.parse_args(argv)
 
 
@@ -784,4 +901,6 @@ if __name__ == "__main__":
         skip_hpo=args.skip_hpo,
         use_mlflow=not args.no_mlflow,
         confidence_threshold=args.confidence_threshold,
+        top_n_classes=args.top_n_classes,
+        balanced_classes=args.balanced_classes,
     )

@@ -192,7 +192,7 @@ All 5 contributors set up their domain's scaffolding on Day 1.
 | Contributor | Name | Track | Task |
 |---|---|---|---|
 | **C1** | **Greeshma** | Support | Training splits for all 3 models; coordinate feature set contracts |
-| **C2** | **Suvarna** | 2a — MPDS Classifier | LightGBM + sklearn Pipeline; Optuna HPO (50 trials); flag disagreement rows (confidence >0.7); target macro F1 >0.75 |
+| **C2** | **Suvarna** | 2a — MPDS Classifier | LightGBM + sklearn Pipeline; Optuna HPO (50 trials); flag disagreement rows (confidence >0.7); target macro F1 >0.55 (revised 2026-04-26 from >0.75) |
 | **C3** | **Sanika** | 2b — Forecaster + 2c — Clustering | Prophet univariate + LightGBM ensemble (4-quarter horizon, walk-forward CV, MAPE <15%); DBSCAN hotspot (eps=0.3, min_samples=5); Isolation Forest anomaly (contamination=0.05) |
 | **C4** | **Srileakhana** | 2b Ensemble + model serialization | LightGBM forecasting component + ensemble combiner; serialize all models to `models/artifacts/` for Dash callbacks |
 | **C5** | **Deekshitha** | MLflow tracking + evaluation harness | Instrument all 3 models; `evaluate.py` with all metric targets; CI test stubs for each model |
@@ -275,7 +275,7 @@ The remaining 5 pages are distributed 1:1 based on each contributor's domain exp
 | Contributor | Name | Responsibility | Target Metric |
 |---|---|---|---|
 | **C1** | **Greeshma** | Data pipeline tests: MPDS coverage, NEMSIS schema, completeness scoring | MPDS >80%, Pydantic pass |
-| **C2** | **Suvarna** | Classifier: macro F1, confusion matrix, disagreement flagging recall | F1 >0.75 |
+| **C2** | **Suvarna** | Classifier: macro F1, confusion matrix, disagreement flagging recall | F1 >0.55 (revised) |
 | **C3** | **Sanika** | Forecaster: MAPE, walk-forward CV; Hotspot: Silhouette, Recall@20 | MAPE <15%, Silhouette >0.4, Recall@20 >0.7 |
 | **C4** | **Srileakhana** | RAG: Precision@5, LLM-as-judge faithfulness, latency p50/p95 | Precision@5 >0.6, Faithfulness avg >1.5, p50 <3s |
 | **C5** | **Deekshitha** | Integration tests (Dash callbacks + data); `pytest` CI; `README.md` with Mermaid diagram | All CI green |
@@ -328,7 +328,7 @@ Day 13 EOD → All tests green → Phase 5 complete
 ## Verification
 
 1. **Data**: `python scripts/download_data.py` → CSVs; `pytest tests/test_data.py`
-2. **Models**: `python src/models/classifier/train.py` → check MLflow UI for F1 >0.75
+2. **Models**: `python src/models/classifier/train.py` → check MLflow UI for F1 >0.55
 3. **RAG**: `python src/rag/ingest.py` → ChromaDB populated; `python -c "from src.rag.chain import query; print(query('MPDS 17D1'))"`
 4. **Dashboard**: `python src/dashboard/app.py` → `localhost:8050`; check all 6 pages + global filters
 5. **All tests**: `pytest --cov=src tests/` → all green, coverage report

@@ -146,6 +146,26 @@ Data is **not stored in the repo** due to file size. Run `python scripts/downloa
 | `geoid` | Census block group FIPS code |
 | `census_block_group_center__x/y` | Block group centroid (lon/lat) |
 
+### RAG Knowledge Base Sources
+
+The protocol Assistant retrieves from a curated corpus listed in
+[`data/external/rag/source_documents/source_registry.json`](data/external/rag/source_documents/source_registry.json).
+Public sources are fetched at ingestion time; downloaded files are gitignored.
+
+| Category | Sources |
+|---|---|
+| PA EMS protocols (pa.gov + EHSF) | PA DOH EMS regulations page, PA DOH 2023 BLS / ALS / IALS protocol PDFs, PA MEDIC protocol index (`pamedic.org/protocols`) |
+| PA fire-service standards (pa.gov OSFC) | Office of the State Fire Commissioner overview; Laws, Acts & Regulations; Firefighter Education & Training; Firefighter Health & Wellness |
+| Regional health system | Penn State Health (`pennstatehealth.org`) |
+| MPDS / NEMSIS / NFPA / WPRDC | MPDS protocol & dispatch-mapping summaries, NEMSIS v3 dictionary & reference, NFPA 1221-2019 metadata, WPRDC data dictionaries |
+
+Refresh the corpus and rebuild the vector store after registry changes:
+
+```bash
+python -m src.rag.ingest --download
+python -m src.rag.vectorstore
+```
+
 ---
 
 ## Dashboard Pages

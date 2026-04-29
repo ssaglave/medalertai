@@ -1,0 +1,83 @@
+{
+  "test_split_rows": 495751,
+  "n_classes": 9,
+  "perturb_frac": 0.05,
+  "seed": 42,
+  "thresholds": [
+    0.5,
+    0.6,
+    0.7,
+    0.8,
+    0.9
+  ],
+  "sweep": [
+    {
+      "threshold": 0.5,
+      "n_perturbed": 24788,
+      "n_unperturbed": 470963,
+      "n_flagged_total": 45626,
+      "n_flagged_perturbed": 9501,
+      "n_flagged_unperturbed": 36125,
+      "recall_on_injected": 0.3833,
+      "false_alarm_rate": 0.0767,
+      "precision_proxy": 0.2082
+    },
+    {
+      "threshold": 0.6,
+      "n_perturbed": 24788,
+      "n_unperturbed": 470963,
+      "n_flagged_total": 26602,
+      "n_flagged_perturbed": 7649,
+      "n_flagged_unperturbed": 18953,
+      "recall_on_injected": 0.3086,
+      "false_alarm_rate": 0.0402,
+      "precision_proxy": 0.2875
+    },
+    {
+      "threshold": 0.7,
+      "n_perturbed": 24788,
+      "n_unperturbed": 470963,
+      "n_flagged_total": 17922,
+      "n_flagged_perturbed": 6522,
+      "n_flagged_unperturbed": 11400,
+      "recall_on_injected": 0.2631,
+      "false_alarm_rate": 0.0242,
+      "precision_proxy": 0.3639
+    },
+    {
+      "threshold": 0.8,
+      "n_perturbed": 24788,
+      "n_unperturbed": 470963,
+      "n_flagged_total": 11248,
+      "n_flagged_perturbed": 5378,
+      "n_flagged_unperturbed": 5870,
+      "recall_on_injected": 0.217,
+      "false_alarm_rate": 0.0125,
+      "precision_proxy": 0.4781
+    },
+    {
+      "threshold": 0.9,
+      "n_perturbed": 24788,
+      "n_unperturbed": 470963,
+      "n_flagged_total": 5891,
+      "n_flagged_perturbed": 3894,
+      "n_flagged_unperturbed": 1997,
+      "recall_on_injected": 0.1571,
+      "false_alarm_rate": 0.0042,
+      "precision_proxy": 0.661
+    }
+  ],
+  "default_threshold": 0.7,
+  "default": {
+    "threshold": 0.7,
+    "n_perturbed": 24788,
+    "n_unperturbed": 470963,
+    "n_flagged_total": 17922,
+    "n_flagged_perturbed": 6522,
+    "n_flagged_unperturbed": 11400,
+    "recall_on_injected": 0.2631,
+    "false_alarm_rate": 0.0242,
+    "precision_proxy": 0.3639
+  },
+  "duration_sec": 16.2
+}

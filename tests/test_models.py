@@ -4,13 +4,28 @@ test_models.py — ML model tests.
 Owners: Suvarna (C2), Sanika (C3)
 Phase: 5
 
-Targets:
-  - Classifier: macro F1 > 0.75
+Targets (real-data plan targets, revised):
+  - Classifier: macro F1 > 0.55 (regression floor 0.42)
   - Forecaster: MAPE < 15%
-  - Clustering: Silhouette > 0.4, Recall@20 > 0.7
+  - Clustering: Silhouette > 0.35, Recall@20 > 0.25
+
+The clustering and classifier asserts in *this* file run on synthetic
+in-test data engineered to clear the original (pre-revision) targets
+of 0.4 / 0.7 — they validate the function logic, not the real-data
+targets, so the assertion thresholds here do not change.
 """
 import pytest
 import pandas as pd
+import numpy as np
+
+from src.models.forecasting.train import train_prophet_model, evaluate_walk_forward
+from src.models.clustering.train import train_dbscan, train_isolation_forest
+
+try:
+    from prophet import Prophet
+    _HAS_PROPHET = True
+except ImportError:
+    _HAS_PROPHET = False
 
 from src.models.forecasting.ensemble import (
     ForecastEnsemble,
@@ -21,9 +36,70 @@ from src.models.forecasting.ensemble import (
 )
 
 
-def test_placeholder():
-    """Placeholder test — replace with real tests."""
-    assert True
+@pytest.mark.skipif(not _HAS_PROPHET, reason="Prophet not installed")
+def test_train_prophet_model():
+    ts = _sample_monthly_series(periods=36)
+    model = train_prophet_model(ts)
+    assert model is not None
+    assert hasattr(model, "predict")
+
+
+@pytest.mark.skipif(not _HAS_PROPHET, reason="Prophet not installed")
+def test_evaluate_walk_forward():
+    ts = _sample_monthly_series(periods=72)
+    model = train_prophet_model(ts)
+    # The dummy data is extremely predictable, so MAPE should be very low
+    metrics = evaluate_walk_forward(model)
+    assert "avg_mape" in metrics
+    assert "target_met" in metrics
+    assert metrics["target_met"] is True
+    assert metrics["avg_mape"] < 0.15
+
+
+def test_train_dbscan_silhouette():
+    np.random.seed(42)
+    df1 = pd.DataFrame({
+        "latitude": np.random.normal(40.0, 0.001, 20),
+        "longitude": np.random.normal(-80.0, 0.001, 20)
+    })
+    df2 = pd.DataFrame({
+        "latitude": np.random.normal(40.5, 0.001, 20),
+        "longitude": np.random.normal(-80.5, 0.001, 20)
+    })
+    hotspot_df = pd.concat([df1, df2]).reset_index(drop=True)
+    res = train_dbscan(hotspot_df)
+    
+    assert res["silhouette_score"] > 0.4
+    assert res["target_met"] is True
+    assert res["n_clusters"] >= 2
+
+
+def test_train_isolation_forest_recall():
+    np.random.seed(42)
+    df_reg = pd.DataFrame({
+        "latitude": np.random.normal(40.0, 0.001, 100),
+        "longitude": np.random.normal(-80.0, 0.001, 100),
+        "hour": 12,
+        "day_of_week": 1,
+        "month": 1,
+        "priority_code": "E3",
+        "incident_id": range(100)
+    })
+    df_anom = pd.DataFrame({
+        "latitude": np.random.normal(45.0, 0.001, 10),
+        "longitude": np.random.normal(-85.0, 0.001, 10),
+        "hour": 3,
+        "day_of_week": 6,
+        "month": 6,
+        "priority_code": "E1",
+        "incident_id": range(100, 110)
+    })
+    full_df = pd.concat([df_reg, df_anom]).reset_index(drop=True)
+    res = train_isolation_forest(full_df)
+    
+    assert "recall_20" in res
+    assert res["recall_20"] > 0.7
+    assert res["target_met"] is True
 
 
 def _sample_monthly_series(periods: int = 30) -> pd.DataFrame:

@@ -1,8 +1,8 @@
 """
 tests/test_rag_eval.py
 
-Phase 3 — RAG evaluation test suite.
-Owner: Deekshitha (C5)
+Phase 5 - RAG evaluation test suite.
+Owner: Srileakhana (C4)
 
 Tests for:
   - Precision@K evaluation with mocked retriever
@@ -35,6 +35,8 @@ from src.rag.eval import (
     compute_latency_percentiles,
     evaluate_faithfulness,
     evaluate_precision_at_k,
+    extract_source_ids,
+    normalize_source_id,
     run_full_evaluation,
     save_report,
     _parse_faithfulness_response,
@@ -207,6 +209,40 @@ class TestPrecisionAtK:
         results = evaluate_precision_at_k(retriever=retriever, queries=[], k=5)
         assert results == []
 
+    def test_source_matching_uses_normalized_metadata_aliases(self):
+        """Source IDs can be recovered from filenames/titles when source_id is absent."""
+        docs = [
+            SimpleNamespace(
+                page_content="NEMSIS response time fields.",
+                metadata={"file_name": "data/external/NEMSIS-v3-data-dictionary.pdf"},
+            ),
+            _make_doc("irrelevant_source"),
+        ]
+        retriever = FakeRetriever(default_docs=docs)
+        queries = [{
+            "question": "NEMSIS response time fields",
+            "relevant_source_ids": {"nemsis_v3_data_dictionary"},
+            "category": "nemsis_standard",
+        }]
+
+        results = evaluate_precision_at_k(retriever=retriever, queries=queries, k=2)
+
+        assert results[0].precision_at_k == 0.5
+
+
+class TestSourceIdNormalization:
+    """Tests for source metadata normalization used by Precision@K."""
+
+    def test_normalize_source_id_handles_paths_extensions_and_punctuation(self):
+        assert normalize_source_id("docs/NEMSIS-v3 Data Dictionary.pdf") == "nemsis_v3_data_dictionary"
+
+    def test_extract_source_ids_reads_multiple_metadata_keys(self):
+        metadata = {
+            "source": "source_documents/mpds_dispatch_mapping.md",
+            "category": "mpds_protocols",
+        }
+        assert extract_source_ids(metadata) == {"mpds_dispatch_mapping", "mpds_protocols"}
+
 
 # ═══════════════════════════════════════════════════════════════════════
 # Faithfulness Scorer Tests
@@ -291,6 +327,11 @@ class TestParseFaithfulnessResponse:
         text = 'Here is my evaluation: {"score": 3, "reasoning": "Fully grounded."} End.'
         result = _parse_faithfulness_response(text)
         assert result["score"] == 3.0
+
+    def test_fenced_json_decimal_response(self):
+        text = '```json\n{"score": 2.5, "reasoning": "Grounded in retrieved context."}\n```'
+        result = _parse_faithfulness_response(text)
+        assert result["score"] == 2.5
 
     def test_score_clamped_to_max(self):
         text = '{"score": 5, "reasoning": "Over the scale."}'
@@ -396,6 +437,14 @@ class TestLatencyPercentiles:
         stats = compute_latency_percentiles(measurements)
         assert stats["p50"] == 1.5
         assert stats["p95"] == 1.5
+
+    def test_even_count_p50_uses_median(self):
+        measurements = [
+            LatencyMeasurement(question="q", latency_s=1.0, success=True),
+            LatencyMeasurement(question="q", latency_s=3.0, success=True),
+        ]
+        stats = compute_latency_percentiles(measurements)
+        assert stats["p50"] == 2.0
 
 
 # ═══════════════════════════════════════════════════════════════════════

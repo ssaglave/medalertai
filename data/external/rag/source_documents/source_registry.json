@@ -21,10 +21,73 @@
     "source_id": "pa_doh_2023_als_protocols",
     "title": "Final 2023 Pennsylvania ALS Protocols",
     "owner": "Pennsylvania Department of Health",
-    "url": "https://www.pa.gov/agencies/health/healthcare-and-public-health-professionals/ems/ems-regulations",
+    "url": "https://www.pa.gov/content/dam/copapwp-pagov/en/health/documents/topics/documents/ems/2023v1-2%20PA%20ALS%20Protocols.pdf",
     "category": "pa_doh_ems",
-    "license_note": "Protocol PDF is linked from the PA DOH EMS regulations page; add the downloaded PDF locally if the URL changes.",
-    "download": false
+    "license_note": "Public government protocol PDF linked from the PA DOH EMS regulations page.",
+    "download": true
+  },
+  {
+    "source_id": "pa_doh_2023_ials_protocols",
+    "title": "Final 2023 Pennsylvania IALS Protocols",
+    "owner": "Pennsylvania Department of Health",
+    "url": "https://www.pa.gov/content/dam/copapwp-pagov/en/health/documents/topics/documents/ems/2023v1-2%20PA%20IALS%20Protocols.pdf",
+    "category": "pa_doh_ems",
+    "license_note": "Public government protocol PDF for Intermediate ALS providers.",
+    "download": true
+  },
+  {
+    "source_id": "pa_osfc_overview",
+    "title": "Pennsylvania Office of the State Fire Commissioner",
+    "owner": "Pennsylvania Office of the State Fire Commissioner",
+    "url": "https://www.pa.gov/agencies/osfc.html",
+    "category": "pa_osfc_fire",
+    "license_note": "Public government landing page for PA fire service standards and resources.",
+    "download": true
+  },
+  {
+    "source_id": "pa_osfc_legislative",
+    "title": "PA OSFC Laws, Acts, and Regulations",
+    "owner": "Pennsylvania Office of the State Fire Commissioner",
+    "url": "https://www.pa.gov/agencies/osfc/about/legislative",
+    "category": "pa_osfc_fire",
+    "license_note": "Public government index of fire-service laws, acts, and regulations.",
+    "download": true
+  },
+  {
+    "source_id": "pa_osfc_education_training",
+    "title": "PA OSFC Firefighter Education and Training Standards",
+    "owner": "Pennsylvania Office of the State Fire Commissioner",
+    "url": "https://www.pa.gov/agencies/osfc/pa-firefighters/education-training",
+    "category": "pa_osfc_fire",
+    "license_note": "Public government page describing PA firefighter education and training standards.",
+    "download": true
+  },
+  {
+    "source_id": "pa_osfc_health_wellness",
+    "title": "PA OSFC Firefighter Health and Wellness Guidance",
+    "owner": "Pennsylvania Office of the State Fire Commissioner",
+    "url": "https://www.pa.gov/agencies/osfc/pa-firefighters/health-wellness",
+    "category": "pa_osfc_fire",
+    "license_note": "Public government guidance on firefighter health, wellness, and on-scene safety.",
+    "download": true
+  },
+  {
+    "source_id": "pamedic_protocols_index",
+    "title": "PA MEDIC Statewide EMS Protocols (BLS / AEMT / ALS / CCT)",
+    "owner": "Emergency Health Services Federation (EHSF) - PA MEDIC",
+    "url": "https://www.pamedic.org/protocols",
+    "category": "pa_doh_ems",
+    "license_note": "Public PA EMS protocol index maintained by EHSF; use as a navigation index for individual protocols.",
+    "download": true
+  },
+  {
+    "source_id": "penn_state_health_overview",
+    "title": "Penn State Health - Regional Health System Overview",
+    "owner": "Penn State Health",
+    "url": "https://www.pennstatehealth.org/",
+    "category": "regional_health_system",
+    "license_note": "Public regional health system landing page; provides hospital and emergency-care context for central PA referrals.",
+    "download": true
   },
   {
     "source_id": "nfpa_1221_2019_reference",
@@ -55,7 +118,7 @@
   },
   {
     "source_id": "mpds_dispatch_mapping",
-    "title": "MPDS Dispatch Mapping (Pittsburgh raw call types → MPDS groups)",
+    "title": "MPDS Dispatch Mapping (Pittsburgh raw call types \u2192 MPDS groups)",
     "owner": "MedAlertAI project",
     "url": "",
     "category": "mpds_protocols",

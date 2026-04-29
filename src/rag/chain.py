@@ -39,11 +39,14 @@ FALLBACK_ANSWER = (
     "corpus, which covers:\n\n"
     "- Medical Priority Dispatch System (MPDS) protocol concepts and structure\n"
     "- Pittsburgh EMS/Fire dispatch call types and their mapping to MPDS codes\n"
-    "- NEMSIS v3 data dictionary and reference fields\n\n"
+    "- NEMSIS v3 data dictionary and reference fields\n"
+    "- Pennsylvania DOH EMS protocols (BLS, ALS, IALS) published on pa.gov\n"
+    "- Pennsylvania Office of the State Fire Commissioner standards, training, "
+    "and regulations published on pa.gov\n\n"
     "Try rephrasing your question around those topics. For anything outside "
-    "this scope (state-specific protocols, individual MPDS dispatch codes not "
-    "yet ingested, etc.), consult the official protocol document or a "
-    "qualified clinical/dispatch supervisor."
+    "this scope (individual MPDS dispatch codes not yet ingested, "
+    "non-Pennsylvania state protocols, etc.), consult the official protocol "
+    "document or a qualified clinical/dispatch supervisor."
 )
 
 SYSTEM_PROMPT = """You are MedAlertAI's EMS and fire dispatch protocol assistant.

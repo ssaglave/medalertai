@@ -34,7 +34,7 @@ app = Dash(
 )
 
 app.title = "MedAlertAI"
-app.config["use_pages"] = True
+dict.__setitem__(app.config, "use_pages", True)
 
 # Expose the underlying Flask server
 server = app.server

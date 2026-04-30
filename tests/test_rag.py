@@ -55,6 +55,8 @@ def test_prompt_contains_protocol_only_fallback():
     assert "Use only the retrieved" in prompt
     assert "Do not use outside medical knowledge" in prompt
     assert "{fallback_answer}" in prompt
+    assert "Keep the answer short" in prompt
+    assert "dashboard appends retrieved source titles" in prompt
 
 
 def test_get_retriever_passes_top_k_to_vectorstore():
@@ -93,6 +95,29 @@ def test_query_returns_answer_and_normalized_sources():
 def test_query_rejects_blank_question():
     with pytest.raises(ValueError, match="question must not be empty"):
         chain.query("   ", qa_chain=FakeQAChain())
+
+
+def test_keyword_fallback_returns_sources(monkeypatch):
+    monkeypatch.setattr(
+        chain,
+        "_rank_chunks_by_keyword",
+        lambda question, limit=5: [
+            {
+                "chunk_id": "c1",
+                "source_id": "pa_doh_nemsis_v350_bulletin",
+                "title": "PA NEMSIS Bulletin",
+                "chunk_index": 1,
+                "text": "Pennsylvania uses NEMSIS v3.5.0 for EMS data collection.",
+                "metadata": {"url": "https://example.test/nemsis", "file_name": "nemsis.pdf"},
+            }
+        ],
+    )
+
+    result = chain.keyword_fallback_query("What NEMSIS version does Pennsylvania use?")
+
+    assert "Based on the retrieved documents" in result["answer"]
+    assert result["sources"][0]["source_id"] == "pa_doh_nemsis_v350_bulletin"
+    assert "NEMSIS v3.5.0" in result["sources"][0]["snippet"]
 
 
 def test_citations_are_deduplicated_and_snippets_are_trimmed():

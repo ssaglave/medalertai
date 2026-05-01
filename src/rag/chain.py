@@ -16,6 +16,7 @@ Usage from the repo root after running ingestion/vectorstore setup:
 from __future__ import annotations
 
 import logging
+import json
 import os
 import re
 from dataclasses import dataclass
@@ -25,7 +26,7 @@ from typing import Any, Iterable
 # despite the prompt instruction not to.
 _CITATION_MARKER_RE = re.compile(r"\s*\[source:[^\]]*\]\s*", re.IGNORECASE)
 
-from config.settings import HUGGINGFACE_API_TOKEN, HUGGINGFACE_ENDPOINT_URL, HUGGINGFACE_MODEL
+from config.settings import HUGGINGFACE_API_TOKEN, HUGGINGFACE_ENDPOINT_URL, HUGGINGFACE_MODEL, PROCESSED_DATA_DIR
 
 
 log = logging.getLogger("medalertai.rag.chain")
@@ -33,17 +34,42 @@ log = logging.getLogger("medalertai.rag.chain")
 DEFAULT_MODEL = os.getenv("HUGGINGFACE_MODEL", HUGGINGFACE_MODEL)
 DEFAULT_HF_ENDPOINT_URL = os.getenv("HUGGINGFACE_ENDPOINT_URL", HUGGINGFACE_ENDPOINT_URL)
 DEFAULT_TOP_K = int(os.getenv("RAG_TOP_K", "5"))
+CHUNKS_PATH = PROCESSED_DATA_DIR / "rag" / "chunks.jsonl"
+_TOKEN_RE = re.compile(r"[a-z0-9]+")
+_KEYWORD_STOPWORDS = {
+    "about",
+    "against",
+    "answer",
+    "could",
+    "does",
+    "from",
+    "have",
+    "into",
+    "that",
+    "the",
+    "this",
+    "what",
+    "when",
+    "where",
+    "which",
+    "with",
+    "would",
+    "your",
+}
 FALLBACK_ANSWER = (
     "I could not find an answer to that in the indexed knowledge base. "
     "This assistant only uses the documents currently ingested into the RAG "
     "corpus, which covers:\n\n"
     "- Medical Priority Dispatch System (MPDS) protocol concepts and structure\n"
     "- Pittsburgh EMS/Fire dispatch call types and their mapping to MPDS codes\n"
-    "- NEMSIS v3 data dictionary and reference fields\n\n"
+    "- NEMSIS v3 data dictionary and reference fields\n"
+    "- Pennsylvania DOH EMS protocols (BLS, ALS, IALS) published on pa.gov\n"
+    "- Pennsylvania Office of the State Fire Commissioner standards, training, "
+    "and regulations published on pa.gov\n\n"
     "Try rephrasing your question around those topics. For anything outside "
-    "this scope (state-specific protocols, individual MPDS dispatch codes not "
-    "yet ingested, etc.), consult the official protocol document or a "
-    "qualified clinical/dispatch supervisor."
+    "this scope (individual MPDS dispatch codes not yet ingested, "
+    "non-Pennsylvania state protocols, etc.), consult the official protocol "
+    "document or a qualified clinical/dispatch supervisor."
 )
 
 SYSTEM_PROMPT = """You are MedAlertAI's EMS and fire dispatch protocol assistant.
@@ -51,13 +77,13 @@ SYSTEM_PROMPT = """You are MedAlertAI's EMS and fire dispatch protocol assistant
 Use only the retrieved protocol, NEMSIS, MPDS mapping, NFPA, and WPRDC context below.
 Do not use outside medical knowledge, do not invent protocol details, and do not
 provide medical direction beyond what the retrieved context supports.
+Keep the answer short: one to three sentences when possible.
 
 If the context does not contain the answer, say exactly:
 "{fallback_answer}"
 
-Do not include source citations, chunk markers, or text like
-"[source: ...; chunk: N]" in your answer; the user sees the sources separately
-in the dashboard.
+Do not include chunk markers or text like "[source: ...; chunk: N]" in your answer;
+the dashboard appends retrieved source titles separately.
 
 Retrieved context:
 {context}
@@ -244,14 +270,24 @@ def query(
     if not cleaned_question:
         raise ValueError("question must not be empty")
 
-    chain = qa_chain or build_qa_chain(k=k)
+    try:
+        chain = qa_chain or build_qa_chain(k=k)
+    except Exception as exc:
+        if qa_chain is not None:
+            raise
+        log.warning("Falling back to local chunk search because RAG chain could not start: %s", exc)
+        return keyword_fallback_query(cleaned_question, k=k, error=exc)
+
     try:
         raw_result = chain.invoke({"query": cleaned_question})
     except AttributeError:
         raw_result = chain({"query": cleaned_question})
     except Exception as exc:
-        log.exception("RAG query failed")
-        raise RagChainError(f"RAG query failed: {exc}") from exc
+        if qa_chain is not None:
+            log.exception("RAG query failed")
+            raise RagChainError(f"RAG query failed: {exc}") from exc
+        log.warning("Falling back to local chunk search because RAG query failed: %s", exc)
+        return keyword_fallback_query(cleaned_question, k=k, error=exc)
 
     answer = _extract_answer(raw_result)
     answer = _CITATION_MARKER_RE.sub(" ", answer).strip()
@@ -260,6 +296,7 @@ def query(
 
     if not answer:
         answer = FALLBACK_ANSWER
+    answer = _append_source_summary(answer, citations)
 
     return {
         "question": cleaned_question,
@@ -267,6 +304,73 @@ def query(
         "sources": [citation.as_dict() for citation in citations],
         "raw": raw_result,
     }
+
+
+def keyword_fallback_query(
+    question: str,
+    k: int = DEFAULT_TOP_K,
+    error: Exception | None = None,
+) -> dict[str, Any]:
+    """Return a source-backed extractive answer when the vector/LLM path is unavailable."""
+    rows = _rank_chunks_by_keyword(question, limit=k)
+    if not rows:
+        return {
+            "question": question,
+            "answer": FALLBACK_ANSWER,
+            "sources": [],
+            "raw": {"fallback": "keyword", "error": str(error or "")},
+        }
+
+    citation_objects = [
+        SourceCitation(
+            source_id=row.get("source_id", ""),
+            title=row.get("title", ""),
+            chunk_index=_optional_int(row.get("chunk_index")),
+            chunk_id=row.get("chunk_id", ""),
+            url=str(row.get("metadata", {}).get("url", "")),
+            file_name=str(row.get("metadata", {}).get("file_name", "")),
+            snippet=_snippet(row.get("text", "")),
+        )
+        for row in rows
+    ]
+    citations = [citation.as_dict() for citation in citation_objects]
+    bullets = "\n".join(f"- {_snippet(row.get('text', ''), max_chars=220)}" for row in rows[:2])
+    answer = f"Based on the retrieved documents:\n\n{bullets}"
+    answer = _append_source_summary(answer, citation_objects)
+    return {
+        "question": question,
+        "answer": answer,
+        "sources": citations,
+        "raw": {"fallback": "keyword", "error": str(error or ""), "rows": rows},
+    }
+
+
+def _rank_chunks_by_keyword(question: str, limit: int = DEFAULT_TOP_K) -> list[dict[str, Any]]:
+    terms = [token for token in _TOKEN_RE.findall(question.lower()) if token not in _KEYWORD_STOPWORDS and len(token) > 2]
+    if not terms or not CHUNKS_PATH.exists():
+        return []
+
+    scored: list[tuple[int, int, dict[str, Any]]] = []
+    with CHUNKS_PATH.open("r", encoding="utf-8") as handle:
+        for row_number, line in enumerate(handle):
+            if not line.strip():
+                continue
+            row = json.loads(line)
+            haystack = " ".join(
+                [
+                    str(row.get("title", "")),
+                    str(row.get("source_id", "")),
+                    str(row.get("text", "")),
+                ]
+            ).lower()
+            score = sum(haystack.count(term) for term in terms)
+            if all(term in haystack for term in terms[: min(3, len(terms))]):
+                score += 5
+            if score:
+                scored.append((score, -row_number, row))
+
+    scored.sort(reverse=True)
+    return [row for _, _, row in scored[: max(limit, 1)]]
 
 
 def citations_from_documents(documents: Iterable[Any]) -> list[SourceCitation]:
@@ -330,6 +434,23 @@ def _snippet(text: str, max_chars: int = 260) -> str:
     if len(cleaned) <= max_chars:
         return cleaned
     return cleaned[: max_chars - 3].rstrip() + "..."
+
+
+def _append_source_summary(answer: str, citations: list[SourceCitation]) -> str:
+    titles: list[str] = []
+    seen: set[str] = set()
+    for citation in citations:
+        title = (citation.title or citation.source_id or "").strip()
+        if not title or title in seen:
+            continue
+        seen.add(title)
+        titles.append(title)
+        if len(titles) == 3:
+            break
+
+    if not titles:
+        return answer
+    return f"{answer}\n\nSources: " + "; ".join(titles)
 
 
 if __name__ == "__main__":

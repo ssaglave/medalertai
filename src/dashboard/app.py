@@ -34,6 +34,7 @@ app = Dash(
 )
 
 app.title = "MedAlertAI"
+dict.__setitem__(app.config, "use_pages", True)
 
 # Expose the underlying Flask server
 server = app.server
@@ -99,7 +100,7 @@ app.layout = dbc.Container([
 if __name__ == "__main__":
     from config.settings import FLASK_HOST, FLASK_PORT, FLASK_DEBUG, FLASK_THREADED
 
-    print(f"🚑 MedAlertAI Dashboard starting on http://{FLASK_HOST}:{FLASK_PORT}")
+    print(f"MedAlertAI Dashboard starting on http://{FLASK_HOST}:{FLASK_PORT}")
     app.run(
         host=FLASK_HOST,
         port=FLASK_PORT,

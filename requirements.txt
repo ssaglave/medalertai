@@ -21,7 +21,7 @@ langchain>=0.1
 langchain-community>=0.0.20
 chromadb>=0.4
 sentence-transformers>=2.5
-anthropic>=0.18
+huggingface-hub>=0.20
 
 # ── Data Validation ──
 pydantic>=2.6

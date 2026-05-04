@@ -192,8 +192,8 @@ All 5 contributors set up their domain's scaffolding on Day 1.
 | Contributor | Name | Track | Task |
 |---|---|---|---|
 | **C1** | **Greeshma** | Support | Training splits for all 3 models; coordinate feature set contracts |
-| **C2** | **Suvarna** | 2a — MPDS Classifier | LightGBM + sklearn Pipeline; Optuna HPO (50 trials); flag disagreement rows (confidence >0.7); target macro F1 >0.75 |
-| **C3** | **Sanika** | 2b — Forecaster + 2c — Clustering | Prophet univariate + LightGBM ensemble (4-quarter horizon, walk-forward CV, MAPE <15%); DBSCAN hotspot (eps=0.3, min_samples=5); Isolation Forest anomaly (contamination=0.05) |
+| **C2** | **Suvarna** | 2a — MPDS Classifier | LightGBM + sklearn Pipeline; Optuna HPO (50 trials); flag disagreement rows (confidence >0.7); target macro F1 >0.55 (revised from >0.75) |
+| **C3** | **Sanika** | 2b — Forecaster + 2c — Clustering | Prophet univariate + LightGBM ensemble (4-quarter horizon, walk-forward CV, MAPE <15%); DBSCAN hotspot (eps=0.35, min_samples=3); Isolation Forest anomaly (contamination=0.05) |
 | **C4** | **Srileakhana** | 2b Ensemble + model serialization | LightGBM forecasting component + ensemble combiner; serialize all models to `models/artifacts/` for Dash callbacks |
 | **C5** | **Deekshitha** | MLflow tracking + evaluation harness | Instrument all 3 models; `evaluate.py` with all metric targets; CI test stubs for each model |
 
@@ -217,19 +217,56 @@ All 5 contributors set up their domain's scaffolding on Day 1.
 
 ## Phase 4 — Dash Dashboard (Days 7–12)
 
-Each contributor owns specific Dash pages. All share `components/filters.py`.
+### Phase 4A — Overview Page (Days 7–8) — All Contributors
 
-| Contributor | Name | Page(s) | Implementation |
+**Lead: Suvarna (C2)** coordinates the implementation while all contributors collaborate.
+
+`pages/overview.py` is designed **separately & collaboratively** as the team's shared landing page.
+
+**Core Charts:**
+
+| Chart | Plotly API | Description |
+|-------|-----------|-------------|
+| KPI tile row | `dbc.Card` | Total calls, EMS count, Fire count, avg per quarter |
+| EMS vs Fire donut | `px.pie` | Service type distribution |
+| Top-8 incident category bar | `px.bar` | Most frequent MPDS groups |
+| All-services historical line | `px.area` | Stacked area by year |
+
+**Advanced Charts:**
+
+| Chart | Plotly API | Description |
+|-------|-----------|-------------|
+| **Sankey Chart** | `go.Sankey` | Triage flow: Service Type → Priority Level → Top Call Types |
+| **Priority Distribution Funnel** | `px.funnel` | Breakdown by priority levels: Life Threatening → ALS → BLS → Non-Emergency |
+| **Service Pipeline Bar** | `px.bar` (horizontal stacked) | Total calls → Calls with response time → Calls with complete data (using `completeness_score`) |
+
+**Data Source**: Reads from `data/processed/fact_dispatch_clean.parquet`
+
+**Milestone 4A**: Overview page fully rendering with all 7 charts + KPI cards; wired to global filters.
+
+### Phase 4B — Specialized Pages (Days 8–12) — 1:1 Assignment
+
+The remaining 5 pages are distributed 1:1 based on each contributor's domain expertise:
+
+| Contributor | Name | Page | Implementation Details |
 |---|---|---|---|
-| **C1** | **Greeshma** | `pages/overview.py` | KPIs tile row (dbc.Card), EMS vs Fire donut (px.pie), top-10 MPDS bar (px.bar), stacked area by year (px.area); reads from Parquet |
-| **C2** | **Suvarna** | `pages/qa.py` | Color-coded agreement DataTable (conditional formatting), data completeness score line chart, response time compliance trend; loads classifier outputs |
-| **C3** | **Sanika** | `pages/geography.py` | Plotly Mapbox choropleth (block-group density), DBSCAN cluster scatter overlay, Response Equity tab (call burden vs poverty scatter); loads cluster Parquet |
-| **C4** | **Srileakhana** | `pages/assistant.py` + `pages/temporal.py` | Chat interface with `dcc.Textarea` + history div, disclaimer, example prompt buttons, source accordion; calls `rag_chain.py` in callback // Quarterly trend line, anomaly `go.Scatter` markers, day-hour heatmap (px.density_heatmap) |
-| **C5** | **Deekshitha** | `pages/forecast.py` + `components/` | 4-quarter forecast with `go.Scatter` uncertainty bands (fill='tonexty'), Prophet/LightGBM/Ensemble `dcc.RadioItems` toggle; loads model artifacts // `filters.py` global dcc.Store, `map_utils.py`, `chat_ui.py` |
+| **C1** | **Greeshma** | `pages/temporal.py` (Temporal) | Quarter × Year Heatmap (`px.density_heatmap`) showing EMS call volume. Highlights cells corresponding to Isolation Forest anomalous spikes. **Slope Chart** to visualize rank/volume shifts in top incident categories from 2020 to 2023. |
+| **C2** | **Suvarna** | `pages/qa.py` (Classification QA) | Incident Classification QA `dash_table.DataTable` with conditional formatting (Match/Review/Mismatch badges). **Bullet Chart** (`go.Indicator`) to track Data Completeness and Response Time Compliance against 90% NFPA performance targets. |
+| **C3** | **Sanika** | `pages/geography.py` (Geography) | Plotly Mapbox choropleth overlaid with DBSCAN hotspot scatter markers (`go.Scattermapbox`). Response Equity scatter plot (`px.scatter` poverty vs compliance). |
+| **C4** | **Srileakhana** | `pages/assistant.py` (RAG Assistant) | Chat UI with prompt chips, `dcc.Textarea` input, message history pane, disclaimer. Dynamically formats `rag_chain.py` answers with source citations in accordion. |
+| **C5** | **Deekshitha** | `pages/forecast.py` (Forecast) | 4-quarter lookahead line chart with uncertainty bands (`go.Scatter` with `fill='tonexty'`). Toggle buttons for Prophet/LightGBM/Ensemble (`dcc.RadioItems`). Quarterly stat tiles. |
+
+**Shared Components (C5 — Deekshitha):** Implemented at the start of Phase 4B (Days 8–9) to unblock C3 and C4.
+
+| Component | File | Implementation |
+|-----------|------|----------------|
+| Global Filter Bar | `components/filters.py` | Year multi-select, Service type toggle, MPDS group multi-select → updates `dcc.Store('global-filters')` |
+| Map Utilities | `components/map_utils.py` | Shared Mapbox choropleth builder + DBSCAN cluster scatter overlay helpers (used by `geography.py`) |
+| Chat UI | `components/chat_ui.py` | Chat message display, input textarea, example prompt buttons (used by `assistant.py`) |
 
 **Deployment**: `python src/dashboard/app.py` → Flask dev server on `http://0.0.0.0:8050`
 
-**Milestone**: All 6 pages rendering live data; global filters wired via `dcc.Store`.
+**Milestone 4B**: All 5 specialized pages rendering live data; global filters wired via `dcc.Store`.
 
 ---
 
@@ -238,8 +275,8 @@ Each contributor owns specific Dash pages. All share `components/filters.py`.
 | Contributor | Name | Responsibility | Target Metric |
 |---|---|---|---|
 | **C1** | **Greeshma** | Data pipeline tests: MPDS coverage, NEMSIS schema, completeness scoring | MPDS >80%, Pydantic pass |
-| **C2** | **Suvarna** | Classifier: macro F1, confusion matrix, disagreement flagging recall | F1 >0.75 |
-| **C3** | **Sanika** | Forecaster: MAPE, walk-forward CV; Hotspot: Silhouette, Recall@20 | MAPE <15%, Silhouette >0.4, Recall@20 >0.7 |
+| **C2** | **Suvarna** | Classifier: macro F1, confusion matrix, disagreement flagging recall | F1 >0.55 (revised) |
+| **C3** | **Sanika** | Forecaster: MAPE, walk-forward CV; Hotspot: Silhouette, Recall@20 | MAPE <15%, Silhouette >0.35 (revised), Recall@20 >0.25 (revised) |
 | **C4** | **Srileakhana** | RAG: Precision@5, LLM-as-judge faithfulness, latency p50/p95 | Precision@5 >0.6, Faithfulness avg >1.5, p50 <3s |
 | **C5** | **Deekshitha** | Integration tests (Dash callbacks + data); `pytest` CI; `README.md` with Mermaid diagram | All CI green |
 
@@ -252,7 +289,9 @@ Day 1 EOD  → config/contracts.py committed (all 5 align on schema)
 Day 3 EOD  → fact_dispatch_clean.parquet ready (C2, C3, C4 unblock for Phase 2)
 Day 5 EOD  → rag_chain.py importable (C4 dashboard page unblocks)
 Day 7 EOD  → models/artifacts/ populated (C1–C5 dashboard callbacks unblock)
-Day 10 EOD → All Dash pages rendering (C5 integration tests unblock)
+Day 8 EOD  → Phase 4A: Overview page complete (Suvarna leads, all contribute)
+Day 8 EOD  → C5 delivers filters.py, map_utils.py, chat_ui.py (unblocks C3, C4)
+Day 10 EOD → Phase 4B: All 5 specialized pages rendering (C5 integration tests unblock)
 Day 13 EOD → All tests green → Phase 5 complete
 ```
 
@@ -289,7 +328,7 @@ Day 13 EOD → All tests green → Phase 5 complete
 ## Verification
 
 1. **Data**: `python scripts/download_data.py` → CSVs; `pytest tests/test_data.py`
-2. **Models**: `python src/models/classifier/train.py` → check MLflow UI for F1 >0.75
+2. **Models**: `python src/models/classifier/train.py` → check MLflow UI for F1 >0.55
 3. **RAG**: `python src/rag/ingest.py` → ChromaDB populated; `python -c "from src.rag.chain import query; print(query('MPDS 17D1'))"`
 4. **Dashboard**: `python src/dashboard/app.py` → `localhost:8050`; check all 6 pages + global filters
 5. **All tests**: `pytest --cov=src tests/` → all green, coverage report

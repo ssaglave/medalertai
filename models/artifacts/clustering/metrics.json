@@ -1,0 +1,5 @@
+{
+  "dbscan_silhouette": 0.3863332271575928,
+  "dbscan_clusters": 2,
+  "iso_forest_recall_20": 0.2203539080845354
+}

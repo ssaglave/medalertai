@@ -1,0 +1,56 @@
+{
+  "Breathing Problems": {
+    "precision": 0.2297,
+    "recall": 0.6845,
+    "f1": 0.344,
+    "support": 29801
+  },
+  "EMS Assist": {
+    "precision": 0.866,
+    "recall": 0.8577,
+    "f1": 0.8618,
+    "support": 77388
+  },
+  "Falls": {
+    "precision": 0.2982,
+    "recall": 0.3772,
+    "f1": 0.3331,
+    "support": 39059
+  },
+  "Fire": {
+    "precision": 0.6222,
+    "recall": 0.731,
+    "f1": 0.6722,
+    "support": 36037
+  },
+  "Other": {
+    "precision": 0.8817,
+    "recall": 0.149,
+    "f1": 0.255,
+    "support": 121871
+  },
+  "Sick Person": {
+    "precision": 0.3814,
+    "recall": 0.3814,
+    "f1": 0.3814,
+    "support": 61955
+  },
+  "Traffic Accident": {
+    "precision": 0.3037,
+    "recall": 0.5576,
+    "f1": 0.3932,
+    "support": 19746
+  },
+  "Unconscious": {
+    "precision": 0.1677,
+    "recall": 0.594,
+    "f1": 0.2616,
+    "support": 18110
+  },
+  "Unknown Problem": {
+    "precision": 0.6871,
+    "recall": 0.4164,
+    "f1": 0.5186,
+    "support": 91784
+  }
+}

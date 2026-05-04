@@ -19,6 +19,8 @@ if str(PROJECT_ROOT) not in sys.path:
 import dash
 from dash import Dash, html, dcc
 import dash_bootstrap_components as dbc
+import pandas as pd
+from src.dashboard.components.filters import create_filter_bar
 
 app = Dash(
     __name__,
@@ -32,9 +34,36 @@ app = Dash(
 )
 
 app.title = "MedAlertAI"
+dict.__setitem__(app.config, "use_pages", True)
 
 # Expose the underlying Flask server
 server = app.server
+
+# Load data for filter initialization. The filter bar only needs unique
+# year / service / call_type values, so read the small overview aggregate
+# (~100 KB) instead of the 134 MB raw fact table. Fall back to a
+# column-subset read of the raw parquet, then a tiny synthetic frame.
+_PROCESSED_DIR = Path(__file__).resolve().parent.parent.parent / "data" / "processed"
+_OVERVIEW_AGG = _PROCESSED_DIR / "overview_agg.parquet"
+_FACT_PARQUET = _PROCESSED_DIR / "fact_dispatch_clean.parquet"
+
+if _OVERVIEW_AGG.exists():
+    _agg = pd.read_parquet(
+        _OVERVIEW_AGG, columns=["year", "service", "call_type"]
+    )
+    data_df = _agg.rename(
+        columns={"year": "CALL_YEAR", "service": "service_type"}
+    )
+elif _FACT_PARQUET.exists():
+    data_df = pd.read_parquet(
+        _FACT_PARQUET, columns=["CALL_YEAR", "service_type", "call_type"]
+    )
+else:
+    data_df = pd.DataFrame({
+        'CALL_YEAR': [2023, 2024],
+        'service_type': ['EMS', 'Fire'],
+        'call_type': ['Respiratory', 'Trauma'],
+    })
 
 # ── Layout ──
 app.layout = dbc.Container([
@@ -54,8 +83,8 @@ app.layout = dbc.Container([
         ],
     ),
 
-    # Global filter store
-    dcc.Store(id="global-filters", data={}),
+    # Global Filter Bar (Critical Blocker — C5)
+    create_filter_bar(data_df),
 
     # Page content
     html.Div(dash.page_container, className="mt-3"),
@@ -71,7 +100,7 @@ app.layout = dbc.Container([
 if __name__ == "__main__":
     from config.settings import FLASK_HOST, FLASK_PORT, FLASK_DEBUG, FLASK_THREADED
 
-    print(f"🚑 MedAlertAI Dashboard starting on http://{FLASK_HOST}:{FLASK_PORT}")
+    print(f"MedAlertAI Dashboard starting on http://{FLASK_HOST}:{FLASK_PORT}")
     app.run(
         host=FLASK_HOST,
         port=FLASK_PORT,

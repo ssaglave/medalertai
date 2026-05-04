@@ -1,0 +1,53 @@
+{
+  "avg_mape": 0.0737826316709193,
+  "target_met": true,
+  "ensemble": {
+    "manifest": {
+      "forecasting": {
+        "prophet_model": "prophet_model.json",
+        "lightgbm_model": "lightgbm_forecaster.joblib",
+        "ensemble_model": "ensemble_model.joblib",
+        "ensemble_forecast": "ensemble_forecast.parquet",
+        "lightgbm_metadata": "lightgbm_metadata.json",
+        "metrics": "metrics.json"
+      },
+      "ensemble_weights": {
+        "prophet": 0.5,
+        "lightgbm": 0.5
+      },
+      "dashboard_output_columns": [
+        "ds",
+        "prophet_yhat",
+        "lightgbm_yhat",
+        "ensemble_yhat",
+        "yhat",
+        "yhat_lower",
+        "yhat_upper"
+      ]
+    },
+    "lightgbm_metadata": {
+      "engine": "LightGBM",
+      "feature_columns": [
+        "month",
+        "quarter",
+        "year",
+        "time_index",
+        "month_sin",
+        "month_cos",
+        "lag_1",
+        "lag_2",
+        "lag_3",
+        "lag_6",
+        "lag_12",
+        "rolling_mean_3",
+        "rolling_mean_6"
+      ],
+      "validation": {
+        "mape": 0.17098725650420932,
+        "n_validation_rows": 6
+      },
+      "n_training_rows": 32
+    },
+    "ensemble_rows": 12
+  }
+}

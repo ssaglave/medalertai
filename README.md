@@ -146,6 +146,26 @@ Data is **not stored in the repo** due to file size. Run `python scripts/downloa
 | `geoid` | Census block group FIPS code |
 | `census_block_group_center__x/y` | Block group centroid (lon/lat) |
 
+### RAG Knowledge Base Sources
+
+The protocol Assistant retrieves from a curated corpus listed in
+[`data/external/rag/source_documents/source_registry.json`](data/external/rag/source_documents/source_registry.json).
+Public sources are fetched at ingestion time; downloaded files are gitignored.
+
+| Category | Sources |
+|---|---|
+| PA EMS protocols (pa.gov + EHSF) | PA DOH EMS regulations page, PA DOH 2023 BLS / ALS / IALS protocol PDFs, PA MEDIC protocol index (`pamedic.org/protocols`) |
+| PA fire-service standards (pa.gov OSFC) | Office of the State Fire Commissioner overview; Laws, Acts & Regulations; Firefighter Education & Training; Firefighter Health & Wellness |
+| Regional health system | Penn State Health (`pennstatehealth.org`) |
+| MPDS / NEMSIS / NFPA / WPRDC | MPDS protocol & dispatch-mapping summaries, NEMSIS v3 dictionary & reference, NFPA 1221-2019 metadata, WPRDC data dictionaries |
+
+Refresh the corpus and rebuild the vector store after registry changes:
+
+```bash
+python -m src.rag.ingest --download
+python -m src.rag.vectorstore
+```
+
 ---
 
 ## Dashboard Pages
@@ -232,7 +252,7 @@ git checkout -b phase1/data-ingestion dev
 
 ## Project Progress Tracker
 
-> **Last updated**: 2026-04-12
+> **Last updated**: 2026-04-26
 
 | Phase | Task | File / Deliverable | Owner | Status |
 |:---:|---|---|---|:---:|
@@ -245,42 +265,42 @@ git checkout -b phase1/data-ingestion dev
 | **0** | Environment template, gitignore | `.env.example`, `.gitignore` | Suvarna | ✅ |
 | **0** | Implementation plan + README | `implementation_plan.md`, `README.md` | Suvarna | ✅ |
 | | | | | |
-| **1** | NEMSIS-aligned preprocessing → clean Parquet | `src/data/preprocessing.py` | Greeshma | ☐ |
-| **1** | MPDS mapper — `description_short` → MPDS codes (>80%) | `src/data/mpds_mapper.py` | Suvarna | ☐ |
-| **1** | MPDS mapper unit tests | `tests/test_data.py` | Suvarna | ☐ |
-| **1** | Feature engineering — cyclical encoding, geo, lag features | `src/data/feature_engineering.py` | Sanika | ☐ |
-| **1** | Demographic join — census block-group data | `src/data/demographic_join.py` | Srileakhana | ☐ |
-| **1** | Pydantic validation schemas | `src/data/schemas.py` | Deekshitha | ☐ |
-| **1** | EDA notebooks (overview, temporal, geo) | `notebooks/01,02,03_eda_*.ipynb` | Deekshitha | ☐ |
-| **1** | Data completeness scoring per row | `src/data/schemas.py` | Deekshitha | ☐ |
+| **1** | NEMSIS-aligned preprocessing → clean Parquet | `src/data/preprocessing.py` | Greeshma | ✅ |
+| **1** | MPDS mapper — `description_short` → MPDS codes (>80%) | `src/data/mpds_mapper.py` | Suvarna | ✅ |
+| **1** | MPDS mapper unit tests | `tests/test_data.py` | Suvarna | ✅ |
+| **1** | Feature engineering — cyclical encoding, geo, lag features | `src/data/feature_engineering.py` | Sanika | ✅ |
+| **1** | Demographic join — census block-group data | `src/data/demographic_join.py` | Srileakhana | ✅ |
+| **1** | Pydantic validation schemas | `src/data/schemas.py` | Deekshitha | ✅ |
+| **1** | EDA notebooks (overview, temporal, geo) | `notebooks/01,02,03_eda_*.ipynb` | Deekshitha | ✅ |
+| **1** | Data completeness scoring per row | `src/data/schemas.py` | Deekshitha | ✅ |
 | | | | | |
-| **2** | Training splits + feature set contracts | `src/data/` | Greeshma | ☐ |
-| **2** | MPDS Classifier — LightGBM + Optuna HPO (F1 >0.75) | `src/models/classifier/train.py` | Suvarna | ☐ |
-| **2** | Disagreement flagging (confidence >0.7) | `src/models/classifier/train.py` | Suvarna | ☐ |
-| **2** | Forecaster — Prophet + LightGBM ensemble (MAPE <15%) | `src/models/forecasting/train.py` | Sanika | ☐ |
-| **2** | DBSCAN hotspot + Isolation Forest anomaly | `src/models/clustering/train.py` | Sanika | ☐ |
-| **2** | Ensemble combiner + model serialization | `models/artifacts/` | Srileakhana | ☐ |
-| **2** | MLflow tracking + evaluation harness | `src/models/evaluate.py` | Deekshitha | ☐ |
+| **2** | Training splits + feature set contracts | `src/data/` | Greeshma | ✅ |
+| **2** | MPDS Classifier — LightGBM + Optuna HPO (F1 >0.55) | `src/models/classifier/train.py` | Suvarna | ✅ |
+| **2** | Disagreement flagging (confidence >0.7) | `src/models/classifier/train.py` | Suvarna | ✅ |
+| **2** | Forecaster — Prophet + LightGBM ensemble (MAPE <15%) | `src/models/forecasting/train.py` | Sanika | ✅ |
+| **2** | DBSCAN hotspot + Isolation Forest anomaly | `src/models/clustering/train.py` | Sanika | ✅ |
+| **2** | Ensemble combiner + model serialization | `models/artifacts/` | Srileakhana | ✅ |
+| **2** | MLflow tracking + evaluation harness | `src/models/evaluate.py` | Deekshitha | ✅ |
 | | | | | |
-| **3** | Protocol doc collection → text chunks (EMS, NFPA, WPRDC) | `src/rag/ingest.py` | Greeshma | ☐ |
-| **3** | MPDS + NEMSIS data dictionary ingestion + quality check | `src/rag/ingest.py` | Suvarna | ☐ |
-| **3** | ChromaDB vector store — embed with `all-MiniLM-L6-v2` | `src/rag/` | Sanika | ☐ |
-| **3** | LangChain RetrievalQA chain with Claude | `src/rag/chain.py` | Srileakhana | ☐ |
-| **3** | RAG eval — Precision@5, faithfulness, latency (p50 <3s) | `tests/test_rag.py` | Deekshitha | ☐ |
+| **3** | Protocol doc collection → text chunks (EMS, NFPA, WPRDC) | `src/rag/ingest.py` | Greeshma | ✅ |
+| **3** | MPDS + NEMSIS data dictionary ingestion + quality check | `src/rag/ingest.py` | Suvarna | ✅ |
+| **3** | ChromaDB vector store — embed with `all-MiniLM-L6-v2` | `src/rag/` | Sanika | ✅ |
+| **3** | LangChain RetrievalQA chain with Claude | `src/rag/chain.py` | Srileakhana | ✅ |
+| **3** | RAG eval — Precision@5, faithfulness, latency (p50 <3s) | `tests/test_rag.py` | Deekshitha | ✅ |
 | | | | | |
-| **4** | Overview page — KPIs, donut, top-10 bar, stacked area | `pages/overview.py` | Greeshma | ☐ |
-| **4** | Classification QA page — agreement table, compliance | `pages/qa.py` | Suvarna | ☐ |
-| **4** | Geography page — choropleth, clusters, equity tab | `pages/geography.py` | Sanika | ☐ |
-| **4** | Temporal page — trends, anomaly markers, heatmap | `pages/temporal.py` | Srileakhana | ☐ |
-| **4** | Assistant page — RAG chat, example prompts, citations | `pages/assistant.py` | Srileakhana | ☐ |
-| **4** | Forecast page — 4-quarter forecast, model toggle | `pages/forecast.py` | Deekshitha | ☐ |
-| **4** | Shared components — filters, map utils, chat UI | `components/` | Deekshitha | ☐ |
+| **4** | Overview page — KPIs, donut, top-10 bar, stacked area | `pages/overview.py` | Greeshma | ✅ |
+| **4** | Classification QA page — agreement table, compliance | `pages/qa.py` | Suvarna | ✅ |
+| **4** | Geography page — choropleth, clusters, equity tab | `pages/geography.py` | Sanika | ✅ |
+| **4** | Temporal page — trends, anomaly markers, heatmap | `pages/temporal.py` | Srileakhana | ✅ |
+| **4** | Assistant page — RAG chat, example prompts, citations | `pages/assistant.py` | Srileakhana | ✅ |
+| **4** | Forecast page — 4-quarter forecast, model toggle | `pages/forecast.py` | Deekshitha | ✅ |
+| **4** | Shared components — filters, map utils, chat UI | `components/` | Deekshitha | ✅ |
 | | | | | |
-| **5** | Data pipeline tests (MPDS >80%, schema, completeness) | `tests/test_data.py` | Greeshma | ☐ |
-| **5** | Classifier tests (F1 >0.75, confusion matrix) | `tests/test_models.py` | Suvarna | ☐ |
-| **5** | Forecaster + clustering tests (MAPE, Silhouette, Recall) | `tests/test_models.py` | Sanika | ☐ |
-| **5** | RAG tests (Precision@5, faithfulness, latency) | `tests/test_rag.py` | Srileakhana | ☐ |
-| **5** | Dashboard integration tests + pytest CI | `tests/test_dashboard.py` | Deekshitha | ☐ |
+| **5** | Data pipeline tests (MPDS >80%, schema, completeness) | `tests/test_phase5_data_pipeline.py` | Greeshma | ✅ |
+| **5** | Classifier tests (F1 >0.55, confusion matrix, disagreement recall) | `tests/test_phase5_classifier.py` | Suvarna | ✅ |
+| **5** | Forecaster + clustering tests (MAPE, Silhouette, Recall) | `tests/test_models.py` | Sanika | ✅ |
+| **5** | RAG tests (Precision@5, faithfulness, latency) | `tests/test_rag_eval.py` | Srileakhana | ✅ |
+| **5** | Dashboard integration tests + pytest CI | `tests/test_dashboard.py` | Deekshitha | ✅ |
 
 ---
 

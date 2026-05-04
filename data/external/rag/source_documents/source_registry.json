@@ -1,0 +1,254 @@
+[
+  {
+    "source_id": "pa_doh_ems_regulations",
+    "title": "Pennsylvania EMS Regulations and Protocols",
+    "owner": "Pennsylvania Department of Health",
+    "url": "https://www.pa.gov/agencies/health/healthcare-and-public-health-professionals/ems/ems-regulations",
+    "category": "pa_doh_ems",
+    "license_note": "Public government web page; use as source index for current protocol PDFs.",
+    "download": true
+  },
+  {
+    "source_id": "pa_doh_2023_bls_protocols",
+    "title": "Final 2023 Pennsylvania BLS Protocols",
+    "owner": "Pennsylvania Department of Health",
+    "url": "https://www.pa.gov/content/dam/copapwp-pagov/en/health/documents/topics/documents/ems/2023v1-2%20PA%20BLS%20Protocols.pdf",
+    "category": "pa_doh_ems",
+    "license_note": "Public government protocol PDF.",
+    "download": true
+  },
+  {
+    "source_id": "pa_doh_2023_als_protocols",
+    "title": "Final 2023 Pennsylvania ALS Protocols",
+    "owner": "Pennsylvania Department of Health",
+    "url": "https://www.pa.gov/content/dam/copapwp-pagov/en/health/documents/topics/documents/ems/2023v1-2%20PA%20ALS%20Protocols.pdf",
+    "category": "pa_doh_ems",
+    "license_note": "Public government protocol PDF linked from the PA DOH EMS regulations page.",
+    "download": true
+  },
+  {
+    "source_id": "pa_doh_2023_ials_protocols",
+    "title": "Final 2023 Pennsylvania IALS Protocols",
+    "owner": "Pennsylvania Department of Health",
+    "url": "https://www.pa.gov/content/dam/copapwp-pagov/en/health/documents/topics/documents/ems/2023v1-2%20PA%20IALS%20Protocols.pdf",
+    "category": "pa_doh_ems",
+    "license_note": "Public government protocol PDF for Intermediate ALS providers.",
+    "download": true
+  },
+  {
+    "source_id": "pa_osfc_overview",
+    "title": "Pennsylvania Office of the State Fire Commissioner",
+    "owner": "Pennsylvania Office of the State Fire Commissioner",
+    "url": "https://www.pa.gov/agencies/osfc.html",
+    "category": "pa_osfc_fire",
+    "license_note": "Public government landing page for PA fire service standards and resources.",
+    "download": true
+  },
+  {
+    "source_id": "pa_osfc_legislative",
+    "title": "PA OSFC Laws, Acts, and Regulations",
+    "owner": "Pennsylvania Office of the State Fire Commissioner",
+    "url": "https://www.pa.gov/agencies/osfc/about/legislative",
+    "category": "pa_osfc_fire",
+    "license_note": "Public government index of fire-service laws, acts, and regulations.",
+    "download": true
+  },
+  {
+    "source_id": "pa_osfc_education_training",
+    "title": "PA OSFC Firefighter Education and Training Standards",
+    "owner": "Pennsylvania Office of the State Fire Commissioner",
+    "url": "https://www.pa.gov/agencies/osfc/pa-firefighters/education-training",
+    "category": "pa_osfc_fire",
+    "license_note": "Public government page describing PA firefighter education and training standards.",
+    "download": true
+  },
+  {
+    "source_id": "pa_osfc_health_wellness",
+    "title": "PA OSFC Firefighter Health and Wellness Guidance",
+    "owner": "Pennsylvania Office of the State Fire Commissioner",
+    "url": "https://www.pa.gov/agencies/osfc/pa-firefighters/health-wellness",
+    "category": "pa_osfc_fire",
+    "license_note": "Public government guidance on firefighter health, wellness, and on-scene safety.",
+    "download": true
+  },
+  {
+    "source_id": "pamedic_protocols_index",
+    "title": "PA MEDIC Statewide EMS Protocols (BLS / AEMT / ALS / CCT)",
+    "owner": "Emergency Health Services Federation (EHSF) - PA MEDIC",
+    "url": "https://www.pamedic.org/protocols",
+    "category": "pa_doh_ems",
+    "license_note": "Public PA EMS protocol index maintained by EHSF; use as a navigation index for individual protocols.",
+    "download": true
+  },
+  {
+    "source_id": "penn_state_health_overview",
+    "title": "Penn State Health - Regional Health System Overview",
+    "owner": "Penn State Health",
+    "url": "https://www.pennstatehealth.org/",
+    "category": "regional_health_system",
+    "license_note": "Public regional health system landing page; provides hospital and emergency-care context for central PA referrals.",
+    "download": true
+  },
+  {
+    "source_id": "pa_doh_nemsis_v350_bulletin",
+    "title": "PA EMS Information Bulletin 2023-15: NEMSIS v3.5.0 Data Collection",
+    "owner": "Pennsylvania Department of Health",
+    "url": "https://www.pa.gov/content/dam/copapwp-pagov/en/health/documents/topics/documents/ems/EMSIB%202023-15%20NEMSIS%20v3.5.0%20Data%20Collection.pdf",
+    "category": "pa_doh_nemsis",
+    "license_note": "Public government bulletin defining the Pennsylvania NEMSIS v3.5.0 transition.",
+    "download": true
+  },
+  {
+    "source_id": "pittsburgh_ems_2023_performance_audit",
+    "title": "Pittsburgh EMS 2023 Performance Audit",
+    "owner": "City of Pittsburgh Controller",
+    "url": "https://www.pittsburghpa.gov/files/assets/city/v/1/controller/documents/performance-audits/22221_emergency_medical_service_final_audit_2023.pdf",
+    "category": "pittsburgh_ems_dispatch",
+    "license_note": "Public city audit; includes Allegheny County 911, MPDS, CAD, and Pittsburgh EMS response-time context.",
+    "download": true
+  },
+  {
+    "source_id": "pittsburgh_ems_2023_operations_summary",
+    "title": "Pittsburgh EMS 2023 Operations Summary",
+    "owner": "City of Pittsburgh Bureau of EMS",
+    "url": "https://www.pittsburghpa.gov/files/assets/city/v/1/public-safety/documents/24716_pittsburgh_ems_2023_operations_summary_report.pdf.pdf",
+    "category": "pittsburgh_ems_operations",
+    "license_note": "Public city EMS operations report.",
+    "download": true
+  },
+  {
+    "source_id": "pittsburgh_ems_2023_cares_report",
+    "title": "Pittsburgh EMS 2023 CARES Cardiac Arrest Report",
+    "owner": "City of Pittsburgh Bureau of EMS",
+    "url": "https://www.pittsburghpa.gov/files/assets/city/v/1/public-safety/documents/24848_2023_cares_report_v.2.pdf",
+    "category": "pittsburgh_ems_outcomes",
+    "license_note": "Public city cardiac arrest outcomes report.",
+    "download": true
+  },
+  {
+    "source_id": "pittsburgh_911_response_times_2025_audit",
+    "title": "Pittsburgh 2025 911 Response Times and Wellness Audit",
+    "owner": "City of Pittsburgh Controller",
+    "url": "https://www.pittsburghpa.gov/files/assets/city/v/1/controller/documents/department-of-public-safety-911-response-times-and-wellness.final.pdf",
+    "category": "pittsburgh_911_dispatch",
+    "license_note": "Public city audit covering 911 response-time and wellness context.",
+    "download": true
+  },
+  {
+    "source_id": "pittsburgh_fire_2023_performance_audit",
+    "title": "Pittsburgh Bureau of Fire 2023 Performance Audit",
+    "owner": "City of Pittsburgh Controller",
+    "url": "https://www.pittsburghpa.gov/files/assets/city/v/1/controller/documents/performance-audits/23382_2023_fire_audit_pittsburgh.pdf",
+    "category": "pittsburgh_fire_operations",
+    "license_note": "Public city fire operations audit.",
+    "download": true
+  },
+  {
+    "source_id": "allegheny_county_ems",
+    "title": "Allegheny County Emergency Medical Services",
+    "owner": "Allegheny County",
+    "url": "https://www.alleghenycounty.us/Government/Police-and-Emergency-Services/Emergency-Services/Emergency-Management/Emergency-Medical-Services-EMS",
+    "category": "allegheny_county_ems",
+    "license_note": "Public county EMS page.",
+    "download": true
+  },
+  {
+    "source_id": "allegheny_county_fire_communications",
+    "title": "Allegheny County Fire Communications",
+    "owner": "Allegheny County",
+    "url": "https://www.alleghenycounty.us/Government/Police-and-Emergency-Services/911-Communications/Fire-Communications",
+    "category": "allegheny_county_fire_dispatch",
+    "license_note": "Public county fire communications page.",
+    "download": true
+  },
+  {
+    "source_id": "allegheny_county_2025_operating_budget",
+    "title": "Allegheny County 2025 Operating Budget",
+    "owner": "Allegheny County",
+    "url": "https://www.alleghenycounty.us/files/assets/county/v/1/government/budget-amp-finance/operating-budget/2025-operating-budget.pdf",
+    "category": "allegheny_county_public_safety_budget",
+    "license_note": "Public county budget; includes emergency services and dispatch operations context.",
+    "download": true
+  },
+  {
+    "source_id": "nemsis_v350_data_dictionary",
+    "title": "NEMSIS v3.5.0 EMS/DEM/State Data Dictionary",
+    "owner": "NEMSIS Technical Assistance Center",
+    "url": "https://nemsis.org/media/nemsis_v3/release-3.5.0/DataDictionary/PDFHTML/EMSDEMSTATE/NEMSISDataDictionary.pdf",
+    "category": "nemsis_standard",
+    "license_note": "Public NEMSIS v3.5.0 data dictionary.",
+    "download": true
+  },
+  {
+    "source_id": "nemsis_pennsylvania_state_page",
+    "title": "NEMSIS Pennsylvania State Page",
+    "owner": "NEMSIS Technical Assistance Center",
+    "url": "https://nemsis.org/state-data-managers/state-map-v3/pennsylvania/",
+    "category": "pa_doh_nemsis",
+    "license_note": "Public NEMSIS Pennsylvania implementation page.",
+    "download": true
+  },
+  {
+    "source_id": "pittsburgh_allegheny_public_sources_digest",
+    "title": "Pittsburgh and Allegheny County Public Dispatch Source Digest",
+    "owner": "MedAlertAI project",
+    "url": "https://www.pittsburghpa.gov/files/assets/city/v/1/controller/documents/performance-audits/22221_emergency_medical_service_final_audit_2023.pdf",
+    "category": "pittsburgh_ems_dispatch",
+    "license_note": "Project-authored digest of public city/county sources for RAG when source servers block scripted downloads. Use official linked PDFs/pages for verification.",
+    "download": false
+  },
+  {
+    "source_id": "nfpa_1221_2019_reference",
+    "title": "NFPA 1221-2019 Standard Reference Page",
+    "owner": "National Fire Protection Association",
+    "url": "https://webstore.ansi.org/standards/nfpa/nfpa12212019",
+    "category": "nfpa_communications",
+    "license_note": "Do not commit NFPA standard PDFs. Use this public metadata page or a locally licensed copy only.",
+    "download": false
+  },
+  {
+    "source_id": "wprdc_data_dictionaries",
+    "title": "WPRDC Data Dictionaries",
+    "owner": "Western Pennsylvania Regional Data Center",
+    "url": "https://wiki.wprdc.org/wiki/Data_Dictionaries",
+    "category": "wprdc_glossary",
+    "license_note": "Public WPRDC wiki page explaining data dictionary fields.",
+    "download": true
+  },
+  {
+    "source_id": "mpds_protocol_reference",
+    "title": "MPDS Protocol Reference (Educational Summary)",
+    "owner": "MedAlertAI project (educational summary based on public MPDS information)",
+    "url": "",
+    "category": "mpds_protocols",
+    "license_note": "Educational reference summary; MPDS is proprietary to IAED. Do not redistribute the IAED standard itself.",
+    "download": false
+  },
+  {
+    "source_id": "mpds_dispatch_mapping",
+    "title": "MPDS Dispatch Mapping (Pittsburgh raw call types \u2192 MPDS groups)",
+    "owner": "MedAlertAI project",
+    "url": "",
+    "category": "mpds_protocols",
+    "license_note": "Project-authored mapping document tying WPRDC Pittsburgh dispatch records to MPDS protocol groups.",
+    "download": false
+  },
+  {
+    "source_id": "nemsis_v3_data_dictionary",
+    "title": "NEMSIS v3 Data Dictionary (Project Subset)",
+    "owner": "MedAlertAI project (based on NEMSIS v3.5 standard)",
+    "url": "https://nemsis.org/technical-resources/version-3/",
+    "category": "nemsis_standard",
+    "license_note": "Subset reference of the NEMSIS v3 standard, used for educational purposes.",
+    "download": false
+  },
+  {
+    "source_id": "nemsis_v3_reference",
+    "title": "NEMSIS v3 Reference Overview",
+    "owner": "MedAlertAI project (based on NEMSIS v3 public materials)",
+    "url": "https://nemsis.org/",
+    "category": "nemsis_standard",
+    "license_note": "Educational overview of NEMSIS v3 data standard; sourced from public NEMSIS materials.",
+    "download": false
+  }
+]
